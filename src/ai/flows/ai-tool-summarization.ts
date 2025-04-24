@@ -25,6 +25,7 @@ const SummarizeAiToolOutputSchema = z.object({
   category: z.string().describe('The category of the AI tool.'),
   tags: z.array(z.string()).describe('Tags associated with the AI tool.'),
   apiAvailable: z.boolean().describe('Whether the tool has an API available'),
+  name: z.string().describe('The name of the AI tool.'),
 });
 export type SummarizeAiToolOutput = z.infer<typeof SummarizeAiToolOutputSchema>;
 
@@ -50,6 +51,7 @@ const summarizeAiToolPrompt = ai.definePrompt({
       category: z.string().describe('The category of the AI tool.'),
       tags: z.array(z.string()).describe('Tags associated with the AI tool.'),
       apiAvailable: z.boolean().describe('Whether the tool has an API available'),
+      name: z.string().describe('The name of the AI tool.'),
     }),
   },
   prompt: `You are an AI agent specializing in discovering, organizing, and classifying AI tools. Create a concise summary of the AI tool (max 3 lines), determine its category and relevant tags, and determine if it has an API.
@@ -92,6 +94,9 @@ const summarizeAiToolFlow = ai.defineFlow<
       websiteDescription: websiteMetadata?.description ?? '',
       websiteKeywords: websiteMetadata?.keywords?.join(',') ?? '',
     });
-    return output!;
+    return {
+      ...output!,
+      name: input.name,
+    };
   }
 );

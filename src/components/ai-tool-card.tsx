@@ -8,6 +8,7 @@ interface AiToolCardProps {
     category: string;
     tags: string[];
     apiAvailable: boolean;
+    name: string;
   };
 }
 
@@ -15,10 +16,11 @@ export function AiToolCard({aiTool}: AiToolCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{aiTool.category}</CardTitle>
-        <CardDescription>{aiTool.summary}</CardDescription>
+        <CardTitle>{aiTool.name}</CardTitle>
+        <CardDescription>{aiTool.category}</CardDescription>
       </CardHeader>
       <CardContent>
+        <CardDescription>{aiTool.summary}</CardDescription>
         <div className="mb-4">
           {aiTool.tags.map((tag) => (
             <Badge key={tag} className="mr-2">

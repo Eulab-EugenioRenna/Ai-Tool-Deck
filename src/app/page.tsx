@@ -60,7 +60,7 @@ function AiToolList() {
   const [aiTools, setAiTools] = useState<AiTool[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
@@ -143,7 +143,8 @@ function AiToolList() {
     const categoryFilter = selectedCategory
       ? tool.category === selectedCategory
       : true;
-    const brandFilter = selectedBrand ? tool.brand === selectedBrand : true;
+    const brandFilter =
+      selectedBrands.length > 0 ? selectedBrands.includes(tool.brand) : true;
 
     const matchesSearchTerm =
       tool.name.toLowerCase().includes(searchTerm) ||
@@ -177,7 +178,7 @@ function AiToolList() {
     } catch (error: any) {
       console.error('Errore durante l\'eliminazione del tool AI:', error);
       toast({
-        title: 'Errore',
+        title: 'Error',
         description:
           error?.message || 'Failed to delete AI tool. Please try again.',
         variant: 'destructive',
@@ -287,6 +288,16 @@ function AiToolList() {
     }
   };
 
+  const toggleBrand = (brand: string) => {
+    setSelectedBrands(prev => {
+      if (prev.includes(brand)) {
+        return prev.filter(b => b !== brand);
+      } else {
+        return [...prev, brand];
+      }
+    });
+  };
+
   return (
     <div>
       <Navbar />
@@ -304,16 +315,27 @@ function AiToolList() {
               onChange={e => setSearch(e.target.value)}
               className="mb-4"
             />
+            <div className="mb-4">
+              {brands.map(brand => (
+                <Button
+                  key={brand}
+                  variant={selectedBrands.includes(brand) ? 'primary' : 'secondary'}
+                  className="mr-2 mb-2"
+                  onClick={() => toggleBrand(brand)}
+                >
+                  {brand}
+                </Button>
+              ))}
+            </div>
             <div className="flex flex-wrap items-center space-x-2 mt-4 md:mt-0">
               <button
                 className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  selectedCategory === null && selectedBrand === null
+                  selectedCategory === null
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
                 onClick={() => {
                   setSelectedCategory(null);
-                  setSelectedBrand(null);
                 }}
               >
                 Tutti
@@ -328,26 +350,9 @@ function AiToolList() {
                   }`}
                   onClick={() => {
                     setSelectedCategory(category);
-                    setSelectedBrand(null);
                   }}
                 >
                   {category}
-                </button>
-              ))}
-              {brands.map(brand => (
-                <button
-                  key={brand}
-                  className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    selectedBrand === brand
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
-                  }`}
-                  onClick={() => {
-                    setSelectedBrand(brand);
-                    setSelectedCategory(null);
-                  }}
-                >
-                  {brand}
                 </button>
               ))}
             </div>

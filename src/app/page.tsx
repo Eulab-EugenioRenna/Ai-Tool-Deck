@@ -40,9 +40,7 @@ export default function Home() {
 
       // Save the data here
       await saveData({
-        summary: summary.summary,
-        tags: summary.tags,
-        apiAvailable: summary.apiAvailable,
+        summary: summary,
         name: name,
         link: link,
         category: category,

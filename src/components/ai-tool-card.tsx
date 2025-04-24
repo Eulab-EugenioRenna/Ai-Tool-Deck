@@ -1,6 +1,11 @@
-
 import {Badge} from '@/components/ui/badge';
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 interface AiToolCardProps {
   aiTool: {
@@ -10,14 +15,16 @@ interface AiToolCardProps {
     apiAvailable: boolean;
     name: string;
   };
+  title?: string;
+  subtitle?: string;
 }
 
-export function AiToolCard({aiTool}: AiToolCardProps) {
+export function AiToolCard({aiTool, title, subtitle}: AiToolCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{aiTool.name}</CardTitle>
-        <CardDescription>{aiTool.category}</CardDescription>
+        <CardTitle>{title || aiTool.name}</CardTitle>
+        <CardDescription>{subtitle || aiTool.category}</CardDescription>
       </CardHeader>
       <CardContent>
         <CardDescription>{aiTool.summary}</CardDescription>

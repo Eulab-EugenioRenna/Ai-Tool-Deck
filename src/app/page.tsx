@@ -7,10 +7,24 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {Separator} from '@/components/ui/separator';
 import {toast} from '@/hooks/use-toast';
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import PocketBase from 'pocketbase';
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
+
+interface AiTool {
+  id: string;
+  name: string;
+  link: string;
+  category: string;
+  source: string;
+  summary: {
+    summary: string;
+    category: string;
+    tags: string[];
+    apiAvailable: boolean;
+  };
+}
 
 export default function Home() {
   const [name, setName] = useState('');
@@ -26,6 +40,31 @@ export default function Home() {
       }
     | undefined
   >(undefined);
+
+  const [aiTools, setAiTools] = useState<AiTool[]>([]);
+
+  useEffect(() => {
+    const fetchAiTools = async () => {
+      try {
+        const records = await pb.collection('tools_ai').getFullList({
+          sort: '-created',
+        });
+
+        const typedRecords = records as unknown as AiTool[];
+        setAiTools(typedRecords);
+      } catch (error: any) {
+        console.error('Error fetching AI tools:', error);
+        toast({
+          title: 'Error',
+          description:
+            error?.message || 'Failed to fetch AI tools. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    fetchAiTools();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +104,9 @@ export default function Home() {
   const saveData = async (data: any) => {
     try {
       const record = await pb.collection('tools_ai').create(data);
+
+      setAiTools(prevAiTools => [...prevAiTools, record as unknown as AiTool]);
+
       console.log('Data saved:', record);
     } catch (error: any) {
       console.error('Error saving to PocketBase:', error);
@@ -141,7 +183,15 @@ export default function Home() {
           <AiToolCard aiTool={aiToolSummary} />
         </div>
       )}
+
+      <Separator className="my-4" />
+
+      <h2 className="text-xl font-semibold mb-2">AI Tool List:</h2>
+      <div className="grid gap-4">
+        {aiTools.map((tool) => (
+          <AiToolCard key={tool.id} aiTool={tool.summary} title={tool.name} subtitle={tool.category}/>
+        ))}
+      </div>
     </div>
   );
 }
-

@@ -174,7 +174,7 @@ function AiToolList() {
           onChange={e => setSearch(e.target.value)}
           className="mb-4 md:mb-0"
         />
-        <div className="flex flex-wrap items-center space-x-2">
+        <div className="flex flex-wrap items-center space-x-2 mt-4 md:mt-0">
           <button
             className={`px-4 py-2 rounded-md text-sm font-medium ${
               selectedCategory === null
@@ -194,6 +194,7 @@ function AiToolList() {
                   : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
               onClick={() => setSelectedCategory(category)}
+              style={{marginLeft: '0.5rem', marginBottom: '0.5rem'}}
             >
               {category}
             </button>
@@ -207,19 +208,21 @@ function AiToolList() {
               aiTool={tool.summary}
               title={tool.name}
               subtitle={tool.category}
-            />
-            <div className="flex justify-between mt-2">
-              <Button size="icon" onClick={() => handleEdit(tool)}>
-                <Edit className="h-4 w-4"/>
-              </Button>
-              <Button
-                size="icon"
-                variant="destructive"
-                onClick={() => handleDelete(tool.id)}
-              >
-                <Trash className="h-4 w-4"/>
-              </Button>
-            </div>
+            >
+              <div className="flex justify-end mt-2">
+                <Button size="icon" variant="ghost" onClick={() => handleEdit(tool)} className="text-primary hover:bg-accent">
+                  <Edit className="h-4 w-4"/>
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => handleDelete(tool.id)}
+                  className="text-destructive hover:bg-accent"
+                >
+                  <Trash className="h-4 w-4"/>
+                </Button>
+              </div>
+            </AiToolCard>
           </div>
         ))}
       </div>
@@ -290,3 +293,4 @@ export default function Home() {
     </div>
   );
 }
+

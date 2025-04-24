@@ -5,6 +5,10 @@ import {toast} from '@/hooks/use-toast';
 import {useEffect, useState} from 'react';
 import PocketBase from 'pocketbase';
 import {Input} from '@/components/ui/input';
+import {Button} from '@/components/ui/button';
+import {Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog';
+import {Label} from '@/components/ui/label';
+import {Textarea} from '@/components/ui/textarea';
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
@@ -28,6 +32,15 @@ interface SummarizeAiToolOutput {
 function AiToolList() {
   const [aiTools, setAiTools] = useState<AiTool[]>([]);
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
+  const [editTool, setEditTool] = useState<AiTool | null>(null);
+  const [editedName, setEditedName] = useState('');
+  const [editedLink, setEditedLink] = useState('');
+  const [editedCategory, setEditedCategory] = useState('');
+  const [editedSource, setEditedSource] = useState('');
+  const [editedSummary, setEditedSummary] = useState('');
 
   useEffect(() => {
     const fetchAiTools = async () => {
@@ -46,6 +59,12 @@ function AiToolList() {
         }));
 
         setAiTools(typedRecords as AiTool[]);
+
+        // Extract unique categories
+        const uniqueCategories = [
+          ...new Set(typedRecords.map(tool => tool.category)),
+        ];
+        setCategories(uniqueCategories);
       } catch (error: any) {
         console.error('Error fetching AI tools:', error);
         toast({
@@ -72,36 +91,193 @@ function AiToolList() {
 
   const filteredTools = aiTools.filter(tool => {
     const searchTerm = search.toLowerCase();
-    return (
+    const categoryFilter = selectedCategory
+      ? tool.category === selectedCategory
+      : true;
+
+    const matchesSearchTerm =
       tool.name.toLowerCase().includes(searchTerm) ||
       tool.category.toLowerCase().includes(searchTerm) ||
       tool.source.toLowerCase().includes(searchTerm) ||
       tool.summary.summary.toLowerCase().includes(searchTerm) ||
       tool.summary.category.toLowerCase().includes(searchTerm) ||
-      tool.summary.tags.some(tag => tag.toLowerCase().includes(searchTerm))
-    );
+      tool.summary.tags.some(tag => tag.toLowerCase().includes(searchTerm));
+
+    return categoryFilter && matchesSearchTerm;
   });
+
+  const handleDelete = async (id: string) => {
+    try {
+      await pb.collection('tools_ai').delete(id);
+      toast({
+        title: 'AI Tool Deleted!',
+        description: 'The AI tool has been successfully deleted.',
+      });
+    } catch (error: any) {
+      console.error('Error deleting AI tool:', error);
+      toast({
+        title: 'Error',
+        description:
+          error?.message || 'Failed to delete AI tool. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleEdit = (tool: AiTool) => {
+    setEditTool(tool);
+    setEditedName(tool.name);
+    setEditedLink(tool.link);
+    setEditedCategory(tool.category);
+    setEditedSource(tool.source);
+    setEditedSummary(tool.summary.summary);
+    setOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!editTool) return;
+
+    try {
+      await pb.collection('tools_ai').update(editTool.id, {
+        name: editedName,
+        link: editedLink,
+        category: editedCategory,
+        source: editedSource,
+        'summary.summary': editedSummary,
+      });
+
+      setOpen(false);
+      toast({
+        title: 'AI Tool Updated!',
+        description: 'The AI tool has been successfully updated.',
+      });
+    } catch (error: any) {
+      console.error('Error updating AI tool:', error);
+      toast({
+        title: 'Error',
+        description:
+          error?.message || 'Failed to update AI tool. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   return (
     <section id="list">
       <h2 className="text-xl font-semibold mb-2">AI Tool List:</h2>
-      <Input
-        type="text"
-        placeholder="Search AI tools..."
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        className="mb-4"
-      />
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <div className="flex flex-wrap items-center justify-between mb-4">
+        <Input
+          type="text"
+          placeholder="Search AI tools..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="mb-4 md:mb-0"
+        />
+        <div className="flex flex-wrap items-center space-x-2">
+          <button
+            className={`px-4 py-2 rounded-md text-sm font-medium ${
+              selectedCategory === null
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
+            }`}
+            onClick={() => setSelectedCategory(null)}
+          >
+            All
+          </button>
+          {categories.map(category => (
+            <button
+              key={category}
+              className={`px-4 py-2 rounded-md text-sm font-medium ${
+                selectedCategory === category
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
+              }`}
+              onClick={() => setSelectedCategory(category)}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="masonry-grid">
         {filteredTools.map(tool => (
-          <AiToolCard
-            key={tool.id}
-            aiTool={tool.summary}
-            title={tool.name}
-            subtitle={tool.category}
-          />
+          <div key={tool.id} className="masonry-grid-item">
+            <AiToolCard
+              aiTool={tool.summary}
+              title={tool.name}
+              subtitle={tool.category}
+            />
+            <div className="flex justify-between mt-2">
+              <Button size="sm" onClick={() => handleEdit(tool)}>
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => handleDelete(tool.id)}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
         ))}
       </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit AI Tool</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={editedName}
+                onChange={e => setEditedName(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="link">Link</Label>
+              <Input
+                id="link"
+                value={editedLink}
+                onChange={e => setEditedLink(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="category">Category</Label>
+              <Input
+                id="category"
+                value={editedCategory}
+                onChange={e => setEditedCategory(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="source">Source</Label>
+              <Input
+                id="source"
+                value={editedSource}
+                onChange={e => setEditedSource(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="summary">Summary</Label>
+              <Textarea
+                id="summary"
+                value={editedSummary}
+                onChange={e => setEditedSummary(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="secondary">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleSave}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

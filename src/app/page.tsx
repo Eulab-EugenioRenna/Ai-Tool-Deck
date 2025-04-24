@@ -60,7 +60,9 @@ function AiToolList() {
   const [aiTools, setAiTools] = useState<AiTool[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [editTool, setEditTool] = useState<AiTool | null>(null);
   const [editedName, setEditedName] = useState('');
@@ -107,6 +109,10 @@ function AiToolList() {
         ...new Set(typedRecords.map(tool => tool.category)),
       ];
       setCategories(uniqueCategories);
+
+      // Extract unique brands
+      const uniqueBrands = [...new Set(typedRecords.map(tool => tool.brand))];
+      setBrands(uniqueBrands);
     } catch (error: any) {
       console.error('Error fetching AI tools:', error);
       toast({
@@ -137,6 +143,7 @@ function AiToolList() {
     const categoryFilter = selectedCategory
       ? tool.category === selectedCategory
       : true;
+    const brandFilter = selectedBrand ? tool.brand === selectedBrand : true;
 
     const matchesSearchTerm =
       tool.name.toLowerCase().includes(searchTerm) ||
@@ -147,7 +154,7 @@ function AiToolList() {
       tool.summary.category.toLowerCase().includes(searchTerm) ||
       tool.summary.tags.some(tag => tag.toLowerCase().includes(searchTerm));
 
-    return categoryFilter && matchesSearchTerm;
+    return categoryFilter && brandFilter && matchesSearchTerm;
   });
 
   const confirmDelete = (id: string) => {
@@ -300,11 +307,14 @@ function AiToolList() {
             <div className="flex flex-wrap items-center space-x-2 mt-4 md:mt-0">
               <button
                 className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  selectedCategory === null
+                  selectedCategory === null && selectedBrand === null
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
-                onClick={() => setSelectedCategory(null)}
+                onClick={() => {
+                  setSelectedCategory(null);
+                  setSelectedBrand(null);
+                }}
               >
                 Tutti
               </button>
@@ -316,9 +326,28 @@ function AiToolList() {
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
                   }`}
-                  onClick={() => setSelectedCategory(category)}
+                  onClick={() => {
+                    setSelectedCategory(category);
+                    setSelectedBrand(null);
+                  }}
                 >
                   {category}
+                </button>
+              ))}
+              {brands.map(brand => (
+                <button
+                  key={brand}
+                  className={`px-4 py-2 rounded-md text-sm font-medium ${
+                    selectedBrand === brand
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
+                  }`}
+                  onClick={() => {
+                    setSelectedBrand(brand);
+                    setSelectedCategory(null);
+                  }}
+                >
+                  {brand}
                 </button>
               ))}
             </div>

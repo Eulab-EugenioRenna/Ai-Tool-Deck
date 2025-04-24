@@ -5,12 +5,9 @@ import {AiToolCard} from '@/components/ai-tool-card';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
-import {Separator} from '@/components/ui/separator';
 import {toast} from '@/hooks/use-toast';
-import {useState} from 'react';
-import PocketBase from 'pocketbase';
-
-const pb = new PocketBase('https://pocketbase.eulab.cloud');
+import {useEffect, useState} from 'react';
+import {v4 as uuidv4} from 'uuid';
 
 interface SummarizeAiToolOutput {
   summary: string;
@@ -26,9 +23,33 @@ function AiToolForm() {
   const [category, setCategory] = useState('');
   const [source, setSource] = useState('');
   const [aiToolSummary, setAiToolSummary] = useState<SummarizeAiToolOutput | undefined>(undefined);
+  const [savedTools, setSavedTools] = useState<string[]>([]); // Array of tool names
+
+  useEffect(() => {
+    // Load saved tools from local storage on component mount
+    const storedTools = localStorage.getItem('savedTools');
+    if (storedTools) {
+      setSavedTools(JSON.parse(storedTools));
+    }
+  }, []);
+
+  useEffect(() => {
+    // Save tools to local storage whenever savedTools changes
+    localStorage.setItem('savedTools', JSON.stringify(savedTools));
+  }, [savedTools]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (savedTools.includes(name)) {
+      toast({
+        title: 'Duplicate Tool',
+        description: 'This AI tool has already been saved.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const summary = await summarizeAiTool({
         name: name,
@@ -38,6 +59,7 @@ function AiToolForm() {
       });
       setAiToolSummary(summary);
 
+      // Save the data here
       await saveData({
         summary: summary,
         name: name,
@@ -45,6 +67,8 @@ function AiToolForm() {
         category: category,
         source: source,
       });
+
+      setSavedTools(prevTools => [...prevTools, name]); // Add tool name to savedTools
 
       toast({
         title: 'AI Tool Summarized and Saved!',
@@ -62,17 +86,16 @@ function AiToolForm() {
   };
 
   const saveData = async (data: any) => {
-    try {
-      const record = await pb.collection('tools_ai').create(data);
-      console.log('Data saved:', record);
-    } catch (error: any) {
-      console.error('Error saving to PocketBase:', error);
-      toast({
-        title: 'Error saving to PocketBase',
-        description: error?.message || 'Failed to save AI tool data.',
-        variant: 'destructive',
-      });
-    }
+    // TODO: Implement saving to your desired database or service here
+    // Example:
+    // await fetch('/api/save-data', {
+    //   method: 'POST',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //   },
+    //   body: JSON.stringify(data),
+    // });
+    console.log('Data to be saved:', data);
   };
 
   return (

@@ -16,7 +16,7 @@ const SummarizeAiToolInputSchema = z.object({
   name: z.string().describe('The name of the AI tool.'),
   link: z.string().describe('The link to the AI tool website or GitHub repository.'),
   category: z.string().optional().describe('The category of the AI tool (optional).'),
-  source: z.string().describe('The source where the AI tool was discovered (e.g., Product Hunt, Twitter).'),
+  source: z.string().describe('The source where the AI tool was discovered.'),
 });
 export type SummarizeAiToolInput = z.infer<typeof SummarizeAiToolInputSchema>;
 
@@ -40,7 +40,7 @@ const summarizeAiToolPrompt = ai.definePrompt({
       name: z.string().describe('The name of the AI tool.'),
       link: z.string().describe('The link to the AI tool website or GitHub repository.'),
       category: z.string().optional().describe('The category of the AI tool (optional).'),
-      source: z.string().describe('The source where the AI tool was discovered (e.g., Product Hunt, Twitter).'),
+      source: z.string().describe('The source where the AI tool was discovered.'),
       websiteDescription: z.string().optional().describe('Website description, if available'),
       websiteKeywords: z.string().optional().describe('Website keywords, if available'),
     }),
@@ -54,16 +54,16 @@ const summarizeAiToolPrompt = ai.definePrompt({
       name: z.string().describe('The name of the AI tool.'),
     }),
   },
-  prompt: `You are an AI agent specializing in discovering, organizing, and classifying AI tools. Create a concise summary of the AI tool (max 3 lines), determine its category and relevant tags, and determine if it has an API.
+  prompt: `Sei un agente AI specializzato nella scoperta, organizzazione e classificazione di strumenti di Intelligenza Artificiale (AI Tools). Crea una sintesi concisa dello strumento AI (massimo 3 righe), determina la sua categoria e i tag pertinenti e determina se ha un'API.
 
-Tool Name: {{name}}
+Nome del tool: {{name}}
 Link: {{link}}
-Category (if known): {{category}}
-Source: {{source}}
-Website Description: {{websiteDescription}}
-Website Keywords: {{websiteKeywords}}
+Categoria (se conosciuta): {{category}}
+Fonte: {{source}}
+Descrizione del sito web: {{websiteDescription}}
+Parole chiave del sito web: {{websiteKeywords}}
 
-Summary:`, // Removed Handlebars await function
+Sintesi:`,
 });
 
 const summarizeAiToolFlow = ai.defineFlow<

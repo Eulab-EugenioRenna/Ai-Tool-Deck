@@ -43,6 +43,7 @@ interface AiTool {
   category: string;
   source: string;
   summary: SummarizeAiToolOutput;
+  deleted: boolean;
 }
 
 interface SummarizeAiToolOutput {
@@ -74,10 +75,7 @@ function AiToolList() {
   const [link, setLink] = useState('');
   const [category, setCategory] = useState('');
   const [source, setSource] = useState('');
-  const [webSearchResults, setWebSearchResults] = useState<string[]>([]);
-  const [loadingSearch, setLoadingSearch] = useState(false);
-  const [summaryFromSearch, setSummaryFromSearch] = useState('');
-  const [webSearchLink, setWebSearchLink] = useState('');
+  const [aiToolSummary, setAiToolSummary] = useState<SummarizeAiToolOutput | null>(null);
 
   const fetchAiTools = useCallback(async () => {
     try {
@@ -93,6 +91,7 @@ function AiToolList() {
         category: record.category,
         source: record.source,
         summary: record.summary as SummarizeAiToolOutput,
+        deleted: record.deleted as boolean,
       }));
 
       setAiTools(typedRecords as AiTool[]);
@@ -191,17 +190,19 @@ function AiToolList() {
     if (!editTool) return;
 
     try {
+      const updatedSummary = {
+        ...editTool.summary,
+        summary: editedSummary,
+        tags: editedTags.split(',').map(tag => tag.trim()),
+        apiAvailable: editedApiAvailable,
+      };
+
       await pb.collection('tools_ai').update(editTool.id, {
         name: editedName,
         link: editedLink,
         category: editedCategory,
         source: editedSource,
-        summary: {
-          ...editTool.summary,
-          summary: editedSummary,
-          tags: editedTags.split(',').map(tag => tag.trim()),
-          apiAvailable: editedApiAvailable,
-        },
+        summary: updatedSummary,
       });
 
       setOpen(false);
@@ -227,53 +228,7 @@ function AiToolList() {
     setLink('');
     setCategory('');
     setSource('');
-    setWebSearchResults([]);
-    setSummaryFromSearch('');
-    setWebSearchLink('');
-  };
-
-  const handleSearchWeb = async () => {
-    setLoadingSearch(true);
-    setWebSearchResults([]);
-    setSummaryFromSearch('');
-    setWebSearchLink('');
-
-    try {
-      const searchQuery = name || link;
-      if (!searchQuery) {
-        toast({
-          title: 'Error',
-          description: 'Please enter a tool name or link to search the web.',
-          variant: 'destructive',
-        });
-        setLoadingSearch(false);
-        return;
-      }
-
-      // Mock web search results for demonstration purposes
-      const mockResults = [
-        `https://example.com/ai-tools/${name.toLowerCase().replace(/\s/g, '-')}`,
-        `https://blog.example.com/review-${name.toLowerCase().replace(/\s/g, '-')}`,
-        `https://github.com/ai-tool-repos/${name.toLowerCase().replace(/\s/g, '-')}`,
-      ];
-
-      setWebSearchResults(mockResults);
-
-      // Simulate fetching the first result's content
-      const fetchedLink = mockResults[0];
-      setWebSearchLink(fetchedLink);
-      setSummaryFromSearch(`Summary from ${fetchedLink}: This is a summary of the AI tool.`);
-    } catch (error: any) {
-      console.error('Error searching the web:', error);
-      toast({
-        title: 'Error',
-        description:
-          error?.message || 'Failed to search the web. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingSearch(false);
-    }
+    setAiToolSummary(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -282,7 +237,7 @@ function AiToolList() {
     try {
       const summary = await summarizeAiTool({
         name: name,
-        link: link || webSearchLink,
+        link: link,
         category: category,
         source: source,
       });
@@ -290,15 +245,16 @@ function AiToolList() {
       // Save the data here
       await pb.collection('tools_ai').create({
         name: name,
-        link: link || webSearchLink,
+        link: link,
         category: category,
         source: source,
         summary: summary,
+        deleted: false,
       });
 
       toast({
-        title: 'AI Tool Summarized and Saved!',
-        description: 'The AI tool has been successfully summarized and saved.',
+        title: 'AI Tool Added!',
+        description: 'The AI tool has been successfully added.',
       });
       setOpenFormModal(false);
       fetchAiTools();
@@ -508,76 +464,48 @@ function AiToolList() {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="grid gap-4">
               <div>
-                <Label htmlFor="name">Tool Name</Label>
+                <Label htmlFor="name">Nome del tool</Label>
                 <Input
                   id="name"
                   type="text"
-                  placeholder="Enter tool name"
+                  placeholder="Inserisci il nome del tool"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   required
                 />
               </div>
               <div>
-                <Label htmlFor="link">Link to Website/GitHub</Label>
+                <Label htmlFor="link">Link al sito web/GitHub</Label>
                 <Input
                   id="link"
                   type="url"
-                  placeholder="Enter URL"
+                  placeholder="Inserisci l'URL"
                   value={link}
                   onChange={e => setLink(e.target.value)}
                 />
               </div>
               <div>
-                <Label htmlFor="category">Category (Optional)</Label>
+                <Label htmlFor="category">Categoria (opzionale)</Label>
                 <Input
                   id="category"
                   type="text"
-                  placeholder="Enter category"
+                  placeholder="Inserisci la categoria"
                   value={category}
                   onChange={e => setCategory(e.target.value)}
                 />
               </div>
               <div>
-                <Label htmlFor="source">Source (e.g., Product Hunt, X)</Label>
+                <Label htmlFor="source">Fonte (es. Product Hunt, X)</Label>
                 <Input
                   id="source"
                   type="text"
-                  placeholder="Enter source"
+                  placeholder="Inserisci la fonte"
                   value={source}
                   onChange={e => setSource(e.target.value)}
                   required
                 />
               </div>
-              <Button
-                type="button"
-                onClick={handleSearchWeb}
-                disabled={loadingSearch}
-              >
-                Search Web
-              </Button>
-              {loadingSearch && <p>Searching the web...</p>}
-              {webSearchResults.length > 0 && (
-                <div>
-                  <h3>Web Search Results</h3>
-                  <ul>
-                    {webSearchResults.map((result, index) => (
-                      <li key={index}>
-                        <a href={result} target="_blank" rel="noopener noreferrer">
-                          {result}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {summaryFromSearch && (
-                <div>
-                  <h3>Web Search Results</h3>
-                  <p>{summaryFromSearch}</p>
-                </div>
-              )}
-              <Button type="submit">Summarize AI Tool</Button>
+              <Button type="submit">Riassumi AI Tool</Button>
             </form>
           </DialogContent>
         </Dialog>

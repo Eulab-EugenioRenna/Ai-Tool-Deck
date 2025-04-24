@@ -7,9 +7,10 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {Separator} from '@/components/ui/separator';
 import {toast} from '@/hooks/use-toast';
-import {GithubMetadata} from '@/services/github-analyzer';
-import {WebsiteMetadata} from '@/services/website-analyzer';
 import {useState} from 'react';
+import PocketBase from 'pocketbase';
+
+const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
 export default function Home() {
   const [name, setName] = useState('');
@@ -36,9 +37,21 @@ export default function Home() {
         source: source,
       });
       setAiToolSummary(summary);
+
+      // Save the data here
+      await saveData({
+        summary: summary.summary,
+        tags: summary.tags,
+        apiAvailable: summary.apiAvailable,
+        name: name,
+        link: link,
+        category: category,
+        source: source,
+      });
+
       toast({
-        title: 'AI Tool Summarized!',
-        description: 'The AI tool has been successfully summarized.',
+        title: 'AI Tool Summarized and Saved!',
+        description: 'The AI tool has been successfully summarized and saved.',
       });
     } catch (error: any) {
       console.error('Error summarizing AI tool:', error);
@@ -46,6 +59,20 @@ export default function Home() {
         title: 'Error',
         description:
           error?.message || 'Failed to summarize AI tool. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const saveData = async (data: any) => {
+    try {
+      const record = await pb.collection('tools_ai').create(data);
+      console.log('Data saved:', record);
+    } catch (error: any) {
+      console.error('Error saving to PocketBase:', error);
+      toast({
+        title: 'Error saving to PocketBase',
+        description: error?.message || 'Failed to save AI tool data.',
         variant: 'destructive',
       });
     }

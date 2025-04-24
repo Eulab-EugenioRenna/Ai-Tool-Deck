@@ -1,42 +1,20 @@
 'use client';
 
 import {summarizeAiTool} from '@/ai/flows/ai-tool-summarization';
-import {AiToolCard} from '@/components/ai-tool-card';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {toast} from '@/hooks/use-toast';
-import {useEffect, useState} from 'react';
-import {v4 as uuidv4} from 'uuid';
-
-interface SummarizeAiToolOutput {
-  summary: string;
-  category: string;
-  tags: string[];
-  apiAvailable: boolean;
-  name: string;
-}
+import {useState} from 'react';
+import {useRouter} from 'next/navigation'; // Import useRouter
 
 function AiToolForm() {
   const [name, setName] = useState('');
   const [link, setLink] = useState('');
   const [category, setCategory] = useState('');
   const [source, setSource] = useState('');
-  const [aiToolSummary, setAiToolSummary] = useState<SummarizeAiToolOutput | undefined>(undefined);
   const [savedTools, setSavedTools] = useState<string[]>([]); // Array of tool names
-
-  useEffect(() => {
-    // Load saved tools from local storage on component mount
-    const storedTools = localStorage.getItem('savedTools');
-    if (storedTools) {
-      setSavedTools(JSON.parse(storedTools));
-    }
-  }, []);
-
-  useEffect(() => {
-    // Save tools to local storage whenever savedTools changes
-    localStorage.setItem('savedTools', JSON.stringify(savedTools));
-  }, [savedTools]);
+  const router = useRouter(); // Initialize useRouter
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +35,6 @@ function AiToolForm() {
         category: category,
         source: source,
       });
-      setAiToolSummary(summary);
 
       // Save the data here
       await saveData({
@@ -74,6 +51,8 @@ function AiToolForm() {
         title: 'AI Tool Summarized and Saved!',
         description: 'The AI tool has been successfully summarized and saved.',
       });
+
+      router.push('/'); // Redirect to the AI Tool List page
     } catch (error: any) {
       console.error('Error summarizing AI tool:', error);
       toast({
@@ -147,13 +126,6 @@ function AiToolForm() {
         </div>
         <Button type="submit">Summarize AI Tool</Button>
       </form>
-
-      {aiToolSummary && (
-        <div className="mt-4">
-          <h2 className="text-xl font-semibold mb-2">AI Tool Summary:</h2>
-          <AiToolCard aiTool={aiToolSummary} />
-        </div>
-      )}
     </section>
   );
 }

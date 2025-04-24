@@ -56,6 +56,16 @@ function AiToolList() {
     };
 
     fetchAiTools();
+
+    // Subscribe to changes in the 'tools_ai' collection
+    pb.collection('tools_ai').subscribe('*', function (e) {
+      console.log('PocketBase subscription event:', e);
+      fetchAiTools(); // Refresh the AI tools list
+    });
+
+    return () => {
+      pb.collection('tools_ai').unsubscribe();
+    };
   }, []);
 
   return (

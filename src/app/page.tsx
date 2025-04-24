@@ -34,6 +34,13 @@ import {Label} from '@/components/ui/label';
 import {toast} from '@/hooks/use-toast';
 import {Navbar} from '@/components/navbar';
 import {useRouter} from 'next/navigation';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
@@ -148,6 +155,7 @@ function AiToolList() {
 
     const matchesSearchTerm =
       tool.name.toLowerCase().includes(searchTerm) ||
+      tool.link.toLowerCase().includes(searchTerm) ||
       tool.category.toLowerCase().includes(searchTerm) ||
       tool.source.toLowerCase().includes(searchTerm) ||
       tool.brand.toLowerCase().includes(searchTerm) ||
@@ -315,47 +323,37 @@ function AiToolList() {
               onChange={e => setSearch(e.target.value)}
               className="mb-4"
             />
-            <div className="mb-4">
-              {brands.map(brand => (
-                <Button
-                  key={brand}
-                  variant={selectedBrands.includes(brand) ? 'primary' : 'secondary'}
-                  className="mr-2 mb-2"
-                  onClick={() => toggleBrand(brand)}
-                >
-                  {brand}
-                </Button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center space-x-2 mt-4 md:mt-0">
-              <button
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  selectedCategory === null
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
-                }`}
-                onClick={() => {
-                  setSelectedCategory(null);
-                }}
-              >
-                Tutti
-              </button>
-              {categories.map(category => (
-                <button
-                  key={category}
-                  className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    selectedCategory === category
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
-                  }`}
-                  onClick={() => {
-                    setSelectedCategory(category);
-                  }}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
+
+            <Select onValueChange={(value) => setSelectedCategory(value === "all" ? null : value)}>
+              <SelectTrigger className="w-[180px] mb-4">
+                <SelectValue placeholder="Select Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map(category => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              onValueChange={(value) => {
+                setSelectedBrands(value === "all" ? [] : [value]);
+              }}
+            >
+              <SelectTrigger className="w-[180px] mb-4">
+                <SelectValue placeholder="Select Brand" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brands</SelectItem>
+                {brands.map(brand => (
+                  <SelectItem key={brand} value={brand}>
+                    {brand}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="masonry-grid">
             {filteredTools.map(tool => (

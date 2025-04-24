@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,13 +8,13 @@ body {
 
 @layer base {
   :root {
-    --background: 200 20% 96%; /* Light gray */
-    --foreground: 210 20% 20%; /* Dark gray */
+    --background: 220 20% 98%; /* Light gray */
+    --foreground: 220 20% 20%; /* Dark gray */
     --card: 0 0% 100%;
     --card-foreground: 210 20% 20%;
     --popover: 0 0% 100%;
     --popover-foreground: 210 20% 20%;
-    --primary: 180 100% 25%; /* Teal */
+    --primary: 170 40% 40%; /* Teal */
     --primary-foreground: 0 0% 100%;
     --secondary: 220 14.3% 95.9%;
     --secondary-foreground: 210 20% 20%;
@@ -27,7 +26,7 @@ body {
     --destructive-foreground: 0 0% 98%;
     --border: 220 13% 91%;
     --input: 220 14.3% 95.9%;
-    --ring: 180 100% 25%;
+    --ring: 170 40% 40%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -44,13 +43,13 @@ body {
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
   .dark {
-    --background: 210 20% 20%; /* Dark gray */
-    --foreground: 200 20% 96%; /* Light gray */
+    --background: 210 20% 15%; /* Dark gray */
+    --foreground: 200 10% 96%; /* Light gray */
     --card: 210 20% 20%;
     --card-foreground: 200 20% 96%;
     --popover: 210 20% 20%;
     --popover-foreground: 200 20% 96%;
-    --primary: 180 100% 25%; /* Teal */
+    --primary: 170 40% 40%; /* Teal */
     --primary-foreground: 0 0% 10%;
     --secondary: 220 14.3% 10%;
     --secondary-foreground: 0 0% 98%;
@@ -62,7 +61,7 @@ body {
     --destructive-foreground: 0 0% 98%;
     --border: 220 13% 12%;
     --input: 220 14.3% 10%;
-    --ring: 180 100% 25%;
+    --ring: 170 40% 40%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -87,4 +86,5 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
 

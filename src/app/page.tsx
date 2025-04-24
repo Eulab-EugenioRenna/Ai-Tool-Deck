@@ -157,13 +157,13 @@ function AiToolList() {
       });
       setAiTools(aiTools.filter(tool => tool.id !== deleteToolId));
       toast({
-        title: 'AI Tool Deleted!',
-        description: 'The AI tool has been successfully deleted.',
+        title: 'Tool AI Eliminato!',
+        description: 'Il tool AI è stato eliminato con successo.',
       });
     } catch (error: any) {
-      console.error('Error deleting AI tool:', error);
+      console.error('Errore durante l\'eliminazione del tool AI:', error);
       toast({
-        title: 'Error',
+        title: 'Errore',
         description:
           error?.message || 'Failed to delete AI tool. Please try again.',
         variant: 'destructive',
@@ -207,12 +207,12 @@ function AiToolList() {
 
       setOpen(false);
       toast({
-        title: 'AI Tool Updated!',
-        description: 'The AI tool has been successfully updated.',
+        title: 'Tool AI Aggiornato!',
+        description: 'Il tool AI è stato aggiornato con successo.',
       });
       fetchAiTools();
     } catch (error: any) {
-      console.error('Error updating AI tool:', error);
+      console.error('Errore durante l\'aggiornamento del tool AI:', error);
       toast({
         title: 'Error',
         description:
@@ -253,13 +253,13 @@ function AiToolList() {
       });
 
       toast({
-        title: 'AI Tool Added!',
-        description: 'The AI tool has been successfully added.',
+        title: 'Tool AI Aggiunto!',
+        description: 'Il tool AI è stato aggiunto con successo.',
       });
       setOpenFormModal(false);
       fetchAiTools();
     } catch (error: any) {
-      console.error('Error summarizing AI tool:', error);
+      console.error('Errore durante il riassunto del tool AI:', error);
       toast({
         title: 'Error',
         description:
@@ -275,14 +275,14 @@ function AiToolList() {
       <div className="container mx-auto p-4">
         <section id="list">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">AI Tool List:</h2>
-            <Button onClick={handleOpenFormModal}>Add Tool</Button>
+            <h2 className="text-xl font-semibold">Lista Tool AI:</h2>
+            <Button onClick={handleOpenFormModal}>Aggiungi Tool</Button>
           </div>
           <div className="flex flex-wrap items-center justify-between mb-4">
             <Input
               type="text"
-              placeholder="Search AI tools..."
-              value={search}
+              placeholder="Cerca tool AI..."
+              value={search} 
               onChange={e => setSearch(e.target.value)}
               className="mb-4"
             />
@@ -295,7 +295,7 @@ function AiToolList() {
                 }`}
                 onClick={() => setSelectedCategory(null)}
               >
-                All
+                Tutti
               </button>
               {categories.map(category => (
                 <button
@@ -338,10 +338,10 @@ function AiToolList() {
                       ))}
                     </div>
                     <div>
-                      <span className="font-semibold">API Available:</span>{' '}
-                      {tool.summary.apiAvailable ? 'Yes' : 'No'}
+                      <span className="font-semibold">API Disponibile:</span>{' '}
+                      {tool.summary.apiAvailable ? 'Si' : 'No'}
                     </div>
-                    <div className="flex justify-end mt-2">
+                    <div className="flex justify-end mt-2"> 
                       <Button
                         size="icon"
                         variant="ghost"
@@ -369,7 +369,7 @@ function AiToolList() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit AI Tool</DialogTitle>
+              <DialogTitle>Modifica Tool AI</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
@@ -381,7 +381,7 @@ function AiToolList() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="link">Link</Label>
+                <Label htmlFor="link">Link al sito</Label>
                 <Input
                   id="link"
                   value={editedLink}
@@ -389,7 +389,7 @@ function AiToolList() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="category">Categoria</Label>
                 <Input
                   id="category"
                   value={editedCategory}
@@ -397,7 +397,7 @@ function AiToolList() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="source">Source</Label>
+                <Label htmlFor="source">Fonte</Label>
                 <Input
                   id="source"
                   value={editedSource}
@@ -405,7 +405,7 @@ function AiToolList() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="summary">Summary</Label>
+                <Label htmlFor="summary">Riassunto</Label>
                 <Textarea
                   id="summary"
                   value={editedSummary}
@@ -413,7 +413,7 @@ function AiToolList() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="tags">Tags (comma separated)</Label>
+                <Label htmlFor="tags">Tag (separati da virgola)</Label>
                 <Input
                   id="tags"
                   value={editedTags}
@@ -421,21 +421,21 @@ function AiToolList() {
                 />
               </div>
               <div className="flex items-center space-x-2">
-                <Label htmlFor="apiAvailable">API Available</Label>
+                <Label htmlFor="apiAvailable">API Disponibile</Label>
                 <Checkbox
                   id="apiAvailable"
                   checked={editedApiAvailable}
-                  onCheckedChange={e => setEditedApiAvailable(e)}
+                  onCheckedChange={e => setEditedApiAvailable(!!e)}
                 />
               </div>
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button variant="secondary">Cancel</Button>
+                <Button variant="secondary">Annulla</Button>
               </DialogClose>
-              <Button onClick={handleSave}>Save</Button>
+              <Button onClick={handleSave}>Salva</Button>
             </DialogFooter>
-          </DialogContent>
+          </DialogContent> 
         </Dialog>
 
         <AlertDialog open={openDeleteAlert} onOpenChange={setOpenDeleteAlert}>
@@ -443,15 +443,15 @@ function AiToolList() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. Are you sure you want to delete
-                this tool?
+                Questa azione non può essere annullata. Sei sicuro di voler eliminare
+                questo tool?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setOpenDeleteAlert(false)}>
-                Cancel
+                Annulla
               </AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>
+              <AlertDialogAction onClick={handleDelete}> 
                 Delete
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -460,7 +460,7 @@ function AiToolList() {
         <Dialog open={openFormModal} onOpenChange={setOpenFormModal}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New AI Tool</DialogTitle>
+              <DialogTitle>Aggiungi Nuovo Tool AI</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="grid gap-4">
               <div>
@@ -505,7 +505,7 @@ function AiToolList() {
                   required
                 />
               </div>
-              <Button type="submit">Riassumi AI Tool</Button>
+              <Button type="submit">Riassumi Tool AI</Button>
             </form>
           </DialogContent>
         </Dialog>

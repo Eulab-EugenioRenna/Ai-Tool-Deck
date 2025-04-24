@@ -1,10 +1,10 @@
 # **App Name**: AI Tool Deck
 
-## Core Features:
+## Funzionalità Principali:
 
-- AI Tool Summarization: Generate a concise summary of an AI tool based on its name, link, optional category, and source. This feature acts as a tool to provide essential details for the AI agent to create a structured entry.
-- Structured Tool Card Display: Display each AI tool's information in a structured card format, including its name, category, tags, description, links, and evaluation metrics.
-- Sortable AI Tool List: Implement a searchable and filterable interface to easily browse and sort AI tools by category, tags, and other relevant criteria.
+- Summarizzazione di Tool AI: Genera un riepilogo conciso di uno strumento AI basato sul suo nome, link, categoria opzionale e fonte. Questa funzionalità funge da strumento per fornire dettagli essenziali all'agente AI al fine di creare una voce strutturata.
+- Visualizzazione Strutturata delle Schede dei Tool: Visualizza le informazioni di ciascuno strumento AI in un formato di scheda strutturata, inclusi nome, categoria, tag, descrizione, collegamenti e metriche di valutazione.
+- Lista di Tool AI Ordinabile: Implementa un'interfaccia ricercabile e filtrabile per sfogliare e ordinare facilmente gli strumenti AI per categoria, tag e altri criteri pertinenti.
 
 ## Style Guidelines:
 
@@ -44,11 +44,11 @@ Crea una scheda strutturata con i seguenti campi:
 
 ---
 
-### 🤖 Istruzioni speciali per l’agente AI:
+### 🤖 Istruzioni speciali per l'agente AI:
 
 - Analizza automaticamente il sito del tool (se accessibile) per recuperare descrizione, funzionalità, API e tag.
 - Se manca una categoria, inferiscila dai contenuti del sito o GitHub.
-- Se il tool è nuovo o sperimentale, segnala: `⚠️ Tool in fase early-access / alpha`.
+- Se il tool è nuovo o sperimentale, segnala: `⚠️ Tool in fase di early-access / alpha`.
 - Se il tool è simile ad altri già raccolti, suggerisci connessioni intelligenti ("Simile a Bolt per i workflow automatizzati").
 - Evita duplicati, ma se il tool cambia nome o versione, aggiungi una *versione aggiornata*.
 
@@ -66,7 +66,7 @@ Fonte: [es. Product Hunt, X]
 
 ---
 
-Vuoi che ti prepari **uno script base per testarlo in Langchain, CrewAI, GPT Actions o un agent notebook su Replit**? Posso anche aiutarti a **integrare l’output in Notion o Google Sheets**.
+Vuoi che ti prepari **uno script base per testarlo in Langchain, CrewAI, GPT Actions o un agent notebook su Replit**? Posso anche aiutarti a **integrare l'output in Notion o Google Sheets**.
 
 Dimmi su quale stack vuoi iniziare (es. Python, Replit, Make, Notion API) e ti preparo la base operativa per l’agente.
   

@@ -9,14 +9,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {useRouter} from 'next/navigation';
+import Link from 'next/link';
 
 export function Navbar() {
-  const router = useRouter();
-
   return (
     <nav className="bg-background border-b p-4 mb-8 flex justify-between items-center">
-      <h1 className="text-2xl font-bold">AI Tool Deck</h1>
+      <Link href="/" className="text-2xl font-bold">
+        AI Tool Deck
+      </Link>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -25,11 +25,15 @@ export function Navbar() {
         <DropdownMenuContent className="w-56">
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => router.push('/')}>
-            AI Tools
+          <DropdownMenuItem>
+            <Link href="/" className="w-full block">
+              AI Tools
+            </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push('/form')}>
-            Add AI Tool
+          <DropdownMenuItem>
+            <Link href="/form" className="w-full block">
+              Add AI Tool
+            </Link>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

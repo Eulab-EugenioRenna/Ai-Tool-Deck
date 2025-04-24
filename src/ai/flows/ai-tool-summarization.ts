@@ -54,7 +54,7 @@ const summarizeAiToolPrompt = ai.definePrompt({
       name: z.string().describe('Il nome dello strumento AI.'),
     }),
   },
-  prompt: `Sei un agente AI specializzato nella scoperta, organizzazione e classificazione di strumenti di Intelligenza Artificiale (AI Tools). Crea una sintesi concisa dello strumento AI (massimo 3 righe), determina la sua categoria e i tag pertinenti e determina se ha un'API.
+  prompt: `Sei un agente AI specializzato nella scoperta, organizzazione e classificazione di strumenti di Intelligenza Artificiale (AI Tools). Crea una sintesi concisa in italiano dello strumento AI (massimo 3 righe), determina la sua categoria e i tag pertinenti e determina se ha un'API.
 
 Nome del tool: {{name}}
 Link: {{link}}

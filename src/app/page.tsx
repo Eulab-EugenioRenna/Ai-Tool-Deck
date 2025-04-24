@@ -9,6 +9,7 @@ import {Button} from '@/components/ui/button';
 import {Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog';
 import {Label} from '@/components/ui/label';
 import {Textarea} from '@/components/ui/textarea';
+import {Edit, Trash} from 'lucide-react';
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
@@ -208,15 +209,15 @@ function AiToolList() {
               subtitle={tool.category}
             />
             <div className="flex justify-between mt-2">
-              <Button size="sm" onClick={() => handleEdit(tool)}>
-                Edit
+              <Button size="icon" onClick={() => handleEdit(tool)}>
+                <Edit className="h-4 w-4"/>
               </Button>
               <Button
-                size="sm"
+                size="icon"
                 variant="destructive"
                 onClick={() => handleDelete(tool.id)}
               >
-                Delete
+                <Trash className="h-4 w-4"/>
               </Button>
             </div>
           </div>

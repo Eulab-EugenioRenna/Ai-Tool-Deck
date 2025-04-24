@@ -43,6 +43,8 @@ function AiToolList() {
   const [editedCategory, setEditedCategory] = useState('');
   const [editedSource, setEditedSource] = useState('');
   const [editedSummary, setEditedSummary] = useState('');
+  const [editedTags, setEditedTags] = useState('');
+  const [editedApiAvailable, setEditedApiAvailable] = useState(false);
   const [deleteToolId, setDeleteToolId] = useState<string | null>(null);
   const [openDeleteAlert, setOpenDeleteAlert] = useState(false);
 
@@ -149,6 +151,8 @@ function AiToolList() {
     setEditedCategory(tool.category);
     setEditedSource(tool.source);
     setEditedSummary(tool.summary.summary);
+    setEditedTags(tool.summary.tags.join(', '));
+    setEditedApiAvailable(tool.summary.apiAvailable);
     setOpen(true);
   };
 
@@ -161,7 +165,12 @@ function AiToolList() {
         link: editedLink,
         category: editedCategory,
         source: editedSource,
-        'summary.summary': editedSummary,
+        summary: {
+          ...editTool.summary,
+          summary: editedSummary,
+          tags: editedTags.split(',').map(tag => tag.trim()),
+          apiAvailable: editedApiAvailable,
+        }
       });
 
       setOpen(false);
@@ -225,6 +234,7 @@ function AiToolList() {
               aiTool={tool.summary}
               title={tool.name}
               subtitle={tool.category}
+              link={tool.link}
             >
               <div className="flex justify-end mt-2">
                 <Button size="icon" variant="ghost" onClick={() => handleEdit(tool)} className="text-primary hover:bg-accent">
@@ -288,6 +298,23 @@ function AiToolList() {
                 id="summary"
                 value={editedSummary}
                 onChange={e => setEditedSummary(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="tags">Tags (comma separated)</Label>
+              <Input
+                id="tags"
+                value={editedTags}
+                onChange={e => setEditedTags(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="apiAvailable">API Available</Label>
+              <input
+                id="apiAvailable"
+                type="checkbox"
+                checked={editedApiAvailable}
+                onChange={e => setEditedApiAvailable(e.target.checked)}
               />
             </div>
           </div>

@@ -18,14 +18,23 @@ interface AiToolCardProps {
   };
   title?: string;
   subtitle?: string;
+  link?: string;
   children?: React.ReactNode;
 }
 
-export function AiToolCard({aiTool, title, subtitle, children}: AiToolCardProps) {
+export function AiToolCard({aiTool, title, subtitle, link, children}: AiToolCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{title || aiTool.name}</CardTitle>
+        <CardTitle>
+          {link ? (
+            <a href={link} target="_blank" rel="noopener noreferrer">
+              {title || aiTool.name}
+            </a>
+          ) : (
+            title || aiTool.name
+          )}
+        </CardTitle>
         <CardDescription>{subtitle || aiTool.category}</CardDescription>
       </CardHeader>
       <CardContent>

@@ -1,16 +1,36 @@
 'use client';
 
-import {AiToolCard} from '@/components/ai-tool-card';
-import {toast} from '@/hooks/use-toast';
+import {summarizeAiTool} from '@/ai/flows/ai-tool-summarization';
 import {useEffect, useState} from 'react';
 import PocketBase from 'pocketbase';
-import {Input} from '@/components/ui/input';
-import {Button} from '@/components/ui/button';
-import {Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from '@/components/ui/dialog';
-import {Label} from '@/components/ui/label';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import {Textarea} from '@/components/ui/textarea';
 import {Edit, Trash} from 'lucide-react';
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger} from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
+import {Badge} from '@/components/ui/badge';
+import {Checkbox} from '@/components/ui/checkbox';
+import {Input} from "@/components/ui/input";
+import {Button} from "@/components/ui/button";
+import {Label} from "@/components/ui/label";
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
@@ -230,26 +250,47 @@ function AiToolList() {
       <div className="masonry-grid">
         {filteredTools.map(tool => (
           <div key={tool.id} className="masonry-grid-item">
-            <AiToolCard
-              aiTool={tool.summary}
-              title={tool.name}
-              subtitle={tool.category}
-              link={tool.link}
-            >
-              <div className="flex justify-end mt-2">
-                <Button size="icon" variant="ghost" onClick={() => handleEdit(tool)} className="text-primary hover:bg-accent">
-                  <Edit className="h-4 w-4"/>
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => confirmDelete(tool.id)}
-                  className="text-destructive hover:bg-accent"
-                >
-                  <Trash className="h-4 w-4"/>
-                </Button>
-              </div>
-            </AiToolCard>
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {tool.link ? (
+                    <a href={tool.link} target="_blank" rel="noopener noreferrer">
+                      {tool.name}
+                    </a>
+                  ) : (
+                    tool.name
+                  )}
+                </CardTitle>
+                <CardDescription>{tool.category}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CardDescription>{tool.summary.summary}</CardDescription>
+                <div className="mb-4">
+                  {tool.summary.tags.map((tag) => (
+                    <Badge key={tag} className="mr-2">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+                <div>
+                  <span className="font-semibold">API Available:</span>{' '}
+                  {tool.summary.apiAvailable ? 'Yes' : 'No'}
+                </div>
+                <div className="flex justify-end mt-2">
+                  <Button size="icon" variant="ghost" onClick={() => handleEdit(tool)} className="text-primary hover:bg-accent">
+                    <Edit className="h-4 w-4"/>
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => confirmDelete(tool.id)}
+                    className="text-destructive hover:bg-accent"
+                  >
+                    <Trash className="h-4 w-4"/>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         ))}
       </div>
@@ -308,13 +349,12 @@ function AiToolList() {
                 onChange={e => setEditedTags(e.target.value)}
               />
             </div>
-            <div className="grid gap-2">
+            <div className="flex items-center space-x-2">
               <Label htmlFor="apiAvailable">API Available</Label>
-              <input
+              <Checkbox
                 id="apiAvailable"
-                type="checkbox"
                 checked={editedApiAvailable}
-                onChange={e => setEditedApiAvailable(e.target.checked)}
+                onCheckedChange={e => setEditedApiAvailable(e)}
               />
             </div>
           </div>

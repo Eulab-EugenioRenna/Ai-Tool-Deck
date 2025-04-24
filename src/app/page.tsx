@@ -30,11 +30,11 @@ function AiToolList() {
   useEffect(() => {
     const fetchAiTools = async () => {
       try {
-        const records = await pb.collection('tools_ai').getFullList({
+        const records = await pb.collection('tools_ai').getList(1, 5000, {
           sort: '-created',
         });
 
-        const typedRecords = records.map(record => ({
+        const typedRecords = records.items.map(record => ({
           id: record.id,
           name: record.name,
           link: record.link,

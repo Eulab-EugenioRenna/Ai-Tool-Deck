@@ -33,6 +33,7 @@ import {Button} from '@/components/ui/button';
 import {Label} from '@/components/ui/label';
 import {toast} from '@/hooks/use-toast';
 import {Navbar} from '@/components/navbar';
+import {useRouter} from 'next/navigation';
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
@@ -44,6 +45,7 @@ interface AiTool {
   source: string;
   summary: SummarizeAiToolOutput;
   deleted: boolean;
+  brand: string;
 }
 
 interface SummarizeAiToolOutput {
@@ -68,6 +70,7 @@ function AiToolList() {
   const [editedSummary, setEditedSummary] = useState('');
   const [editedTags, setEditedTags] = useState('');
   const [editedApiAvailable, setEditedApiAvailable] = useState(false);
+  const [editedBrand, setEditedBrand] = useState(''); // Added brand state
   const [deleteToolId, setDeleteToolId] = useState<string | null>(null);
   const [openDeleteAlert, setOpenDeleteAlert] = useState(false);
   const [openFormModal, setOpenFormModal] = useState(false);
@@ -75,7 +78,9 @@ function AiToolList() {
   const [link, setLink] = useState('');
   const [category, setCategory] = useState('');
   const [source, setSource] = useState('');
+  const [brand, setBrand] = useState(''); // Added brand state
   const [aiToolSummary, setAiToolSummary] = useState<SummarizeAiToolOutput | null>(null);
+  const router = useRouter();
 
   const fetchAiTools = useCallback(async () => {
     try {
@@ -92,6 +97,7 @@ function AiToolList() {
         source: record.source,
         summary: record.summary as SummarizeAiToolOutput,
         deleted: record.deleted as boolean,
+        brand: record.brand as string,
       }));
 
       setAiTools(typedRecords as AiTool[]);
@@ -136,6 +142,7 @@ function AiToolList() {
       tool.name.toLowerCase().includes(searchTerm) ||
       tool.category.toLowerCase().includes(searchTerm) ||
       tool.source.toLowerCase().includes(searchTerm) ||
+      tool.brand.toLowerCase().includes(searchTerm) ||
       tool.summary.summary.toLowerCase().includes(searchTerm) ||
       tool.summary.category.toLowerCase().includes(searchTerm) ||
       tool.summary.tags.some(tag => tag.toLowerCase().includes(searchTerm));
@@ -183,6 +190,7 @@ function AiToolList() {
     setEditedSummary(tool.summary.summary);
     setEditedTags(tool.summary.tags.join(', '));
     setEditedApiAvailable(tool.summary.apiAvailable);
+    setEditedBrand(tool.brand); // Set edited brand
     setOpen(true);
   };
 
@@ -203,6 +211,7 @@ function AiToolList() {
         category: editedCategory,
         source: editedSource,
         summary: updatedSummary,
+        brand: editedBrand, // Save edited brand
       });
 
       setOpen(false);
@@ -228,6 +237,7 @@ function AiToolList() {
     setLink('');
     setCategory('');
     setSource('');
+    setBrand(''); // Reset brand
     setAiToolSummary(null);
   };
 
@@ -250,6 +260,7 @@ function AiToolList() {
         source: source,
         summary: summary,
         deleted: false,
+        brand: brand, // Save brand
       });
 
       toast({
@@ -257,7 +268,7 @@ function AiToolList() {
         description: 'Il tool AI è stato aggiunto con successo.',
       });
       setOpenFormModal(false);
-      fetchAiTools();
+      router.push('/');
     } catch (error: any) {
       console.error('Errore durante il riassunto del tool AI:', error);
       toast({
@@ -282,7 +293,7 @@ function AiToolList() {
             <Input
               type="text"
               placeholder="Cerca tool AI..."
-              value={search} 
+              value={search}
               onChange={e => setSearch(e.target.value)}
               className="mb-4"
             />
@@ -338,10 +349,13 @@ function AiToolList() {
                       ))}
                     </div>
                     <div>
+                      <span className="font-semibold">Brand:</span> {tool.brand}
+                    </div>
+                    <div>
                       <span className="font-semibold">API Disponibile:</span>{' '}
                       {tool.summary.apiAvailable ? 'Si' : 'No'}
                     </div>
-                    <div className="flex justify-end mt-2"> 
+                    <div className="flex justify-end mt-2">
                       <Button
                         size="icon"
                         variant="ghost"
@@ -405,6 +419,14 @@ function AiToolList() {
                 />
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="brand">Brand</Label>
+                <Input
+                  id="brand"
+                  value={editedBrand}
+                  onChange={e => setEditedBrand(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="summary">Riassunto</Label>
                 <Textarea
                   id="summary"
@@ -435,13 +457,13 @@ function AiToolList() {
               </DialogClose>
               <Button onClick={handleSave}>Salva</Button>
             </DialogFooter>
-          </DialogContent> 
+          </DialogContent>
         </Dialog>
 
         <AlertDialog open={openDeleteAlert} onOpenChange={setOpenDeleteAlert}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogTitle>Sei assolutamente sicuro?</AlertDialogTitle>
               <AlertDialogDescription>
                 Questa azione non può essere annullata. Sei sicuro di voler eliminare
                 questo tool?
@@ -451,8 +473,8 @@ function AiToolList() {
               <AlertDialogCancel onClick={() => setOpenDeleteAlert(false)}>
                 Annulla
               </AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}> 
-                Delete
+              <AlertDialogAction onClick={handleDelete}>
+                Elimina
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -503,6 +525,16 @@ function AiToolList() {
                   value={source}
                   onChange={e => setSource(e.target.value)}
                   required
+                />
+              </div>
+              <div>
+                <Label htmlFor="brand">Brand</Label>
+                <Input
+                  id="brand"
+                  type="text"
+                  placeholder="Inserisci il brand"
+                  value={brand}
+                  onChange={e => setBrand(e.target.value)}
                 />
               </div>
               <Button type="submit">Riassumi Tool AI</Button>

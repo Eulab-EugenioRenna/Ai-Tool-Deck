@@ -10,6 +10,7 @@ import {Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTi
 import {Label} from '@/components/ui/label';
 import {Textarea} from '@/components/ui/textarea';
 import {Edit, Trash} from 'lucide-react';
+import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger} from "@/components/ui/alert-dialog";
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
@@ -42,12 +43,15 @@ function AiToolList() {
   const [editedCategory, setEditedCategory] = useState('');
   const [editedSource, setEditedSource] = useState('');
   const [editedSummary, setEditedSummary] = useState('');
+  const [deleteToolId, setDeleteToolId] = useState<string | null>(null);
+  const [openDeleteAlert, setOpenDeleteAlert] = useState(false);
 
   useEffect(() => {
     const fetchAiTools = async () => {
       try {
         const records = await pb.collection('tools_ai').getList(1, 5000, {
           sort: '-created',
+          filter: 'deleted = false'
         });
 
         const typedRecords = records.items.map(record => ({
@@ -107,9 +111,19 @@ function AiToolList() {
     return categoryFilter && matchesSearchTerm;
   });
 
-  const handleDelete = async (id: string) => {
+  const confirmDelete = (id: string) => {
+    setDeleteToolId(id);
+    setOpenDeleteAlert(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteToolId) return;
+
     try {
-      await pb.collection('tools_ai').delete(id);
+      await pb.collection('tools_ai').update(deleteToolId, {
+        deleted: true,
+      });
+      setAiTools(aiTools.filter(tool => tool.id !== deleteToolId));
       toast({
         title: 'AI Tool Deleted!',
         description: 'The AI tool has been successfully deleted.',
@@ -122,6 +136,9 @@ function AiToolList() {
           error?.message || 'Failed to delete AI tool. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      setOpenDeleteAlert(false);
+      setDeleteToolId(null);
     }
   };
 
@@ -194,7 +211,7 @@ function AiToolList() {
                   : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
               onClick={() => setSelectedCategory(category)}
-              style={{marginLeft: '0.5rem', marginBottom: '0.5rem'}}
+            
             >
               {category}
             </button>
@@ -216,7 +233,7 @@ function AiToolList() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => handleDelete(tool.id)}
+                  onClick={() => confirmDelete(tool.id)}
                   className="text-destructive hover:bg-accent"
                 >
                   <Trash className="h-4 w-4"/>
@@ -282,6 +299,25 @@ function AiToolList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={openDeleteAlert} onOpenChange={setOpenDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. Are you sure you want to delete this tool?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setOpenDeleteAlert(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
@@ -293,4 +329,3 @@ export default function Home() {
     </div>
   );
 }
-

@@ -4,6 +4,7 @@ import {AiToolCard} from '@/components/ai-tool-card';
 import {toast} from '@/hooks/use-toast';
 import {useEffect, useState} from 'react';
 import PocketBase from 'pocketbase';
+import {Input} from '@/components/ui/input';
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
@@ -26,6 +27,7 @@ interface SummarizeAiToolOutput {
 
 function AiToolList() {
   const [aiTools, setAiTools] = useState<AiTool[]>([]);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     const fetchAiTools = async () => {
@@ -68,11 +70,30 @@ function AiToolList() {
     };
   }, []);
 
+  const filteredTools = aiTools.filter(tool => {
+    const searchTerm = search.toLowerCase();
+    return (
+      tool.name.toLowerCase().includes(searchTerm) ||
+      tool.category.toLowerCase().includes(searchTerm) ||
+      tool.source.toLowerCase().includes(searchTerm) ||
+      tool.summary.summary.toLowerCase().includes(searchTerm) ||
+      tool.summary.category.toLowerCase().includes(searchTerm) ||
+      tool.summary.tags.some(tag => tag.toLowerCase().includes(searchTerm))
+    );
+  });
+
   return (
     <section id="list">
       <h2 className="text-xl font-semibold mb-2">AI Tool List:</h2>
-      <div className="grid gap-4">
-        {aiTools.map(tool => (
+      <Input
+        type="text"
+        placeholder="Search AI tools..."
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        className="mb-4"
+      />
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        {filteredTools.map(tool => (
           <AiToolCard
             key={tool.id}
             aiTool={tool.summary}

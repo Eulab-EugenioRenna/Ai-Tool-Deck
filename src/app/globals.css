@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -87,4 +88,13 @@ body {
   }
 }
 
+.masonry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Adjust minmax value as needed */
+  grid-gap: 20px; /* Adjust gap as needed */
+}
 
+.masonry-grid-item {
+  break-inside: avoid; /* Prevent items from breaking across columns */
+  margin-bottom: 20px; /* Add spacing between items */
+}

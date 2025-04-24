@@ -6,27 +6,20 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {toast} from '@/hooks/use-toast';
 import {useState} from 'react';
-import {useRouter} from 'next/navigation'; // Import useRouter
+import {useRouter} from 'next/navigation';
+import PocketBase from 'pocketbase';
+
+const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
 function AiToolForm() {
   const [name, setName] = useState('');
   const [link, setLink] = useState('');
   const [category, setCategory] = useState('');
   const [source, setSource] = useState('');
-  const [savedTools, setSavedTools] = useState<string[]>([]); // Array of tool names
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (savedTools.includes(name)) {
-      toast({
-        title: 'Duplicate Tool',
-        description: 'This AI tool has already been saved.',
-        variant: 'destructive',
-      });
-      return;
-    }
 
     try {
       const summary = await summarizeAiTool({
@@ -36,7 +29,7 @@ function AiToolForm() {
         source: source,
       });
 
-      // Save the data here
+      // Save the data to PocketBase
       await saveData({
         summary: summary,
         name: name,
@@ -45,14 +38,12 @@ function AiToolForm() {
         source: source,
       });
 
-      setSavedTools(prevTools => [...prevTools, name]); // Add tool name to savedTools
-
       toast({
         title: 'AI Tool Summarized and Saved!',
         description: 'The AI tool has been successfully summarized and saved.',
       });
 
-      router.push('/'); // Redirect to the AI Tool List page
+      router.push('/');
     } catch (error: any) {
       console.error('Error summarizing AI tool:', error);
       toast({
@@ -65,16 +56,25 @@ function AiToolForm() {
   };
 
   const saveData = async (data: any) => {
-    // TODO: Implement saving to your desired database or service here
-    // Example:
-    // await fetch('/api/save-data', {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify(data),
-    // });
-    console.log('Data to be saved:', data);
+    try {
+      const record = await pb.collection('tools_ai').create({
+        name: data.name,
+        link: data.link,
+        category: data.category,
+        source: data.source,
+        summary: data.summary,
+      });
+
+      console.log('Data saved to PocketBase:', record);
+    } catch (error: any) {
+      console.error('Error saving to PocketBase:', error);
+      toast({
+        title: 'Error Saving to Database',
+        description:
+          error?.message || 'Failed to save data to the database. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (

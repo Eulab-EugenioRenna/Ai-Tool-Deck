@@ -2,7 +2,6 @@
 'use client';
 
 import {summarizeAiTool} from '@/ai/flows/ai-tool-summarization';
-// import {searchAiToolDetails} from '@/ai/flows/ai-tool-details-search'; // Removed import
 import {useEffect, useState, useCallback} from 'react';
 import PocketBase from 'pocketbase';
 import {
@@ -15,7 +14,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {Textarea} from '@/components/ui/textarea';
-import {Edit, Trash, Loader2} from 'lucide-react'; // Removed SearchIcon
+import {Edit, Trash, Loader2, RefreshCw} from 'lucide-react'; // Added RefreshCw icon
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,8 +91,8 @@ function AiToolList() {
   const [category, setCategory] = useState('');
   const [source, setSource] = useState('');
   const [brand, setBrand] = useState('');
-  // const [isSearching, setIsSearching] = useState(false); // Removed state for search loading
   const [isSubmitting, setIsSubmitting] = useState(false); // State for submit loading
+  const [isRegenerating, setIsRegenerating] = useState(false); // State for regenerate loading
 
   const router = useRouter();
 
@@ -236,18 +235,57 @@ function AiToolList() {
     setOpenEditDialog(true);
   };
 
+  const handleRegenerateSummary = async () => {
+    if (!editTool) return;
+    setIsRegenerating(true);
+
+    try {
+      const summaryOutput = await summarizeAiTool({
+        name: editedName, // Use edited name
+        link: editedLink, // Use edited link
+        category: editedCategory, // Use edited category
+        source: editedSource, // Use edited source
+      });
+
+      // Update edit form fields with regenerated data
+      setEditedSummary(summaryOutput.summary);
+      setEditedCategory(summaryOutput.category); // Update category in form as well
+      setEditedTags(summaryOutput.tags.join(', '));
+      setEditedApiAvailable(summaryOutput.apiAvailable);
+
+      toast({
+        title: 'Riassunto Rigenerato!',
+        description: 'Il riassunto, la categoria, i tag e la disponibilità API sono stati aggiornati.',
+      });
+
+    } catch (error: any) {
+        console.error('Errore durante la rigenerazione del riassunto:', error);
+        toast({
+            title: 'Errore di Rigenerazione',
+            description:
+                error?.data?.message || error?.message || 'Impossibile rigenerare il riassunto. Riprova.',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsRegenerating(false);
+    }
+  };
+
+
   const handleSave = async () => {
     if (!editTool) return;
     setIsSubmitting(true); // Start loading
 
     try {
-      const updatedSummary = {
+      const updatedSummary: SummarizeAiToolOutput = {
         ...(editTool.summary || {}), // Handle case where summary might be initially null/undefined
         summary: editedSummary,
         tags: editedTags.split(',').map(tag => tag.trim()).filter(tag => tag), // Ensure no empty tags
         apiAvailable: editedApiAvailable,
-        category: editedCategory, // Also update category in summary if needed by AI
-        name: editedName, // Also update name in summary if needed by AI
+        // Use the category from the form (which might have been updated by regeneration or manually)
+        category: editedCategory,
+        // Use the name from the form
+        name: editedName,
       };
 
       const dataToUpdate: Partial<AiTool> & { summary: SummarizeAiToolOutput } = {
@@ -291,7 +329,6 @@ function AiToolList() {
     setOpenFormModal(true);
   };
 
-  // Removed handleWebSearch function
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -554,12 +591,30 @@ function AiToolList() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-summary">Riassunto</Label>
-                <Textarea
-                  id="edit-summary"
-                  value={editedSummary}
-                  onChange={e => setEditedSummary(e.target.value)}
-                  rows={3}
-                />
+                <div className="relative">
+                    <Textarea
+                      id="edit-summary"
+                      value={editedSummary}
+                      onChange={e => setEditedSummary(e.target.value)}
+                      rows={4} // Increased rows for better view
+                      className="pr-12" // Add padding for the button
+                    />
+                    <Button
+                       type="button" // Important: Prevent form submission
+                       variant="ghost"
+                       size="icon"
+                       className="absolute top-1 right-1 h-8 w-8 text-muted-foreground hover:text-primary"
+                       onClick={handleRegenerateSummary}
+                       disabled={isRegenerating || isSubmitting}
+                       title="Rigenera Riassunto"
+                     >
+                       {isRegenerating ? (
+                         <Loader2 className="h-4 w-4 animate-spin" />
+                       ) : (
+                         <RefreshCw className="h-4 w-4" />
+                       )}
+                     </Button>
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-tags">Tag (separati da virgola)</Label>
@@ -583,7 +638,7 @@ function AiToolList() {
               <DialogClose asChild>
                 <Button variant="outline">Annulla</Button>
               </DialogClose>
-               <Button onClick={handleSave} disabled={isSubmitting}>
+               <Button onClick={handleSave} disabled={isSubmitting || isRegenerating}>
                  {isSubmitting ? (
                    <>
                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -625,7 +680,6 @@ function AiToolList() {
               {/* Add Form Fields */}
                <div className="grid gap-2">
                  <Label htmlFor="name">Nome del tool</Label>
-                 {/* Removed Search Button */}
                  <Input
                     id="name"
                     type="text"

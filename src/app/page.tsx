@@ -2,7 +2,7 @@
 'use client';
 
 import {summarizeAiTool} from '@/ai/flows/ai-tool-summarization';
-import {searchAiToolDetails} from '@/ai/flows/ai-tool-details-search'; // Import the new flow
+// import {searchAiToolDetails} from '@/ai/flows/ai-tool-details-search'; // Removed import
 import {useEffect, useState, useCallback} from 'react';
 import PocketBase from 'pocketbase';
 import {
@@ -15,7 +15,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {Textarea} from '@/components/ui/textarea';
-import {Edit, Trash, Search as SearchIcon, Loader2} from 'lucide-react'; // Add SearchIcon, Loader2
+import {Edit, Trash, Loader2} from 'lucide-react'; // Removed SearchIcon
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {Combobox} from '@/components/ui/combobox'; // Import Combobox
+import { Search } from 'lucide-react'; // Keep Search icon for filter bar
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
@@ -91,7 +92,7 @@ function AiToolList() {
   const [category, setCategory] = useState('');
   const [source, setSource] = useState('');
   const [brand, setBrand] = useState('');
-  const [isSearching, setIsSearching] = useState(false); // State for search loading
+  // const [isSearching, setIsSearching] = useState(false); // Removed state for search loading
   const [isSubmitting, setIsSubmitting] = useState(false); // State for submit loading
 
   const router = useRouter();
@@ -102,6 +103,7 @@ function AiToolList() {
       const allRecords = await pb.collection('tools_ai').getFullList({
          filter: 'deleted = false',
          fields: 'id,category,brand,name,link,source,summary,deleted', // Specify fields to fetch
+         sort: '-created', // Sort by creation date descending
       });
 
       const typedRecords = allRecords.map(record => ({
@@ -146,7 +148,7 @@ function AiToolList() {
       console.log('PocketBase subscription event:', e.action, e.record.id);
        // More efficient updates based on action
        if (e.action === 'create') {
-         setAiTools((prevTools) => [...prevTools, { ...e.record, summary: e.record.summary as SummarizeAiToolOutput } as AiTool]);
+         setAiTools((prevTools) => [{ ...e.record, summary: e.record.summary as SummarizeAiToolOutput } as AiTool, ...prevTools]); // Add to beginning
        } else if (e.action === 'update') {
          setAiTools((prevTools) =>
            prevTools.map((tool) =>
@@ -157,7 +159,7 @@ function AiToolList() {
          setAiTools((prevTools) => prevTools.filter((tool) => tool.id !== e.record.id));
        }
         // Optionally, refetch all if complex filtering/sorting is needed after any change
-       fetchAiTools();
+       fetchAiTools(); // Refetch to update categories/brands lists potentially
     });
 
      return () => {
@@ -289,70 +291,42 @@ function AiToolList() {
     setOpenFormModal(true);
   };
 
-  // New function to handle web search for tool details
-  const handleWebSearch = async () => {
-    if (!name) {
-      toast({
-        title: 'Nome Mancante',
-        description: 'Inserisci il nome del tool per avviare la ricerca.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    setIsSearching(true);
-    try {
-      const details = await searchAiToolDetails({ name });
-      if (details) {
-        if (details.link) setLink(details.link);
-        if (details.category) setCategory(details.category);
-        if (details.brand) setBrand(details.brand);
-        toast({
-          title: 'Ricerca Completata',
-          description: 'Campi compilati con i risultati della ricerca.',
-        });
-      } else {
-         toast({
-           title: 'Nessun Risultato',
-           description: 'Impossibile trovare dettagli aggiuntivi per questo tool.',
-           variant: 'destructive',
-         });
-      }
-    } catch (error: any) {
-      console.error('Errore durante la ricerca web:', error);
-      toast({
-        title: 'Errore di Ricerca',
-        description: error?.data?.message || error?.message || 'Ricerca web fallita. Riprova.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
+  // Removed handleWebSearch function
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true); // Start loading
 
+    if (!name || !source) {
+       toast({
+         title: 'Campi Mancanti',
+         description: 'Nome e Fonte sono obbligatori.',
+         variant: 'destructive',
+       });
+       setIsSubmitting(false);
+       return;
+    }
+
+
     try {
       // 1. Summarize the tool using the Genkit flow
       const summaryOutput = await summarizeAiTool({
         name: name,
-        link: link, // Pass the link found (or entered)
-        category: category, // Pass the category found (or entered)
+        link: link, // Pass the link entered by user
+        category: category, // Pass the category selected/created
         source: source,
       });
 
       // Prepare data for PocketBase, ensuring summary is nested correctly
        const dataToSave: Partial<AiTool> & { summary: SummarizeAiToolOutput } = {
          name: name,
-         link: link,
+         link: link, // Save the link entered by user
          // Use AI's category if available, otherwise fallback to user input
          category: summaryOutput.category || category,
          source: source,
          summary: summaryOutput, // Save the entire summary object
          deleted: false,
-         brand: brand, // Save the brand found (or entered)
+         brand: brand, // Save the brand selected/created
        };
 
 
@@ -365,7 +339,7 @@ function AiToolList() {
       });
       setOpenFormModal(false); // Close modal on success
       // No need to manually fetch, subscription should handle it
-      // fetchAiTools();
+      // fetchAiTools(); // Subscription handles updates
        // Reset form fields after successful submission
        setName('');
        setLink('');
@@ -406,7 +380,7 @@ function AiToolList() {
           <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             {/* Search Bar */}
             <div className="relative flex-grow">
-              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
                 placeholder="Cerca tool AI..."
@@ -651,20 +625,15 @@ function AiToolList() {
               {/* Add Form Fields */}
                <div className="grid gap-2">
                  <Label htmlFor="name">Nome del tool</Label>
-                 <div className="flex gap-2">
-                    <Input
-                      id="name"
-                      type="text"
-                      placeholder="Inserisci il nome..."
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      required
-                      className="flex-grow"
-                    />
-                    <Button type="button" onClick={handleWebSearch} disabled={isSearching || !name} variant="outline" size="icon" title="Cerca dettagli online">
-                       {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchIcon className="h-4 w-4" />}
-                    </Button>
-                 </div>
+                 {/* Removed Search Button */}
+                 <Input
+                    id="name"
+                    type="text"
+                    placeholder="Inserisci il nome..."
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    required
+                  />
                </div>
                <div className="grid gap-2">
                  <Label htmlFor="link">Link al sito web/GitHub</Label>
@@ -715,7 +684,7 @@ function AiToolList() {
                     <DialogClose asChild>
                       <Button type="button" variant="outline">Annulla</Button>
                     </DialogClose>
-                    <Button type="submit" disabled={isSubmitting || isSearching}>
+                    <Button type="submit" disabled={isSubmitting}>
                        {isSubmitting ? (
                          <>
                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />

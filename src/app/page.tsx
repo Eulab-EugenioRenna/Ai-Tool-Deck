@@ -11,7 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'; // Removed DialogTrigger as it's not directly used here for modal
+} from '@/components/ui/dialog';
 import {Textarea} from '@/components/ui/textarea';
 import {Edit, Trash, Loader2, RefreshCw, Search as SearchIcon} from 'lucide-react';
 import {
@@ -32,16 +32,7 @@ import {Button} from '@/components/ui/button';
 import {Label} from '@/components/ui/label';
 import {toast} from '@/hooks/use-toast';
 import {Navbar} from '@/components/navbar';
-// useRouter is not used, can be removed if not needed for future navigation.
-// import {useRouter} from 'next/navigation';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {Combobox} from '@/components/ui/combobox';
+import { Combobox } from '@/components/ui/combobox'; // Changed from Select
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
@@ -92,8 +83,6 @@ function AiToolList() {
   const [brand, setBrand] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
-
-  // const router = useRouter(); // Not currently used
 
   const fetchAiTools = useCallback(async () => {
     try {
@@ -151,11 +140,11 @@ function AiToolList() {
        } else if (e.action === 'delete') {
          setAiTools((prevTools) => prevTools.filter((tool) => tool.id !== e.record.id));
        }
-       fetchAiTools();
+       fetchAiTools(); // Refetch all to update categories/brands lists
     });
      return () => {
        console.log('Unsubscribing from PocketBase');
-       unsubscribe();
+       pb.collection('tools_ai').unsubscribe(); // Ensure unsubscribe is called without arguments if that's the correct API
      };
   }, [fetchAiTools]);
 
@@ -229,11 +218,11 @@ function AiToolList() {
       const summaryOutput = await summarizeAiTool({
         name: editedName,
         link: editedLink,
-        category: editedCategory,
+        category: editedCategory, // Pass the potentially user-modified category
         source: editedSource,
       });
       setEditedSummary(summaryOutput.summary);
-      setEditedCategory(summaryOutput.category);
+      setEditedCategory(summaryOutput.category); // Update category based on AI's output
       setEditedTags(summaryOutput.tags.join(', '));
       setEditedApiAvailable(summaryOutput.apiAvailable);
       toast({
@@ -258,17 +247,17 @@ function AiToolList() {
     setIsSubmitting(true);
     try {
       const updatedSummary: SummarizeAiToolOutput = {
-        ...(editTool.summary || {}),
+        ...(editTool.summary || {}), // Preserve existing non-updated summary fields if any
         summary: editedSummary,
         tags: editedTags.split(',').map(tag => tag.trim()).filter(tag => tag),
         apiAvailable: editedApiAvailable,
-        category: editedCategory,
-        name: editedName,
+        category: editedCategory, // Use the (potentially AI updated) category
+        name: editedName, // Ensure name from input is used
       };
       const dataToUpdate: Partial<AiTool> & { summary: SummarizeAiToolOutput } = {
         name: editedName,
         link: editedLink,
-        category: editedCategory,
+        category: editedCategory, // Persist the final category
         source: editedSource,
         summary: updatedSummary,
         brand: editedBrand,
@@ -279,7 +268,7 @@ function AiToolList() {
         title: 'Tool AI Aggiornato!',
         description: 'Il tool AI è stato aggiornato con successo.',
       });
-    } catch (error: any) {
+    } catch (error: any)      {
       console.error('Errore durante l\'aggiornamento del tool AI:', error);
       toast({
         title: 'Errore',
@@ -323,7 +312,7 @@ function AiToolList() {
        const dataToSave: Partial<AiTool> & { summary: SummarizeAiToolOutput } = {
          name: name,
          link: link,
-         category: summaryOutput.category || category,
+         category: summaryOutput.category || category, // Prefer AI category, fallback to user input
          source: source,
          summary: summaryOutput,
          deleted: false,
@@ -352,6 +341,10 @@ function AiToolList() {
         setIsSubmitting(false);
     }
   };
+  
+  const categoryItems = [{ value: "all", label: "Tutte le Categorie" }, ...categories.map(cat => ({ value: cat, label: cat }))];
+  const brandItems = [{ value: "all", label: "Tutti i Brand" }, ...brands.map(br => ({ value: br, label: br }))];
+
 
   return (
     <div>
@@ -368,45 +361,31 @@ function AiToolList() {
                   placeholder="Cerca tool AI..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="pl-10 w-full text-base" 
+                  className="pl-10 w-full text-base"
                 />
               </div>
 
-              <Select
-                   value={selectedCategoryFilter ?? 'all'}
-                   onValueChange={(value) => setSelectedCategoryFilter(value === "all" ? null : value)}
-               >
-                <SelectTrigger className="w-full text-base">
-                  <SelectValue placeholder="Filtra per Categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutte le Categorie</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                items={categoryItems}
+                value={selectedCategoryFilter ?? "all"}
+                onChange={(value) => setSelectedCategoryFilter(value === "all" ? null : value)}
+                placeholder="Filtra per Categoria"
+                inputPlaceholder="Cerca categoria..."
+                emptyMessage="Nessuna categoria trovata."
+                className="text-base"
+                allowNew={false}
+              />
 
-               <Select
-                    value={selectedBrandsFilter.length === 1 ? selectedBrandsFilter[0] : 'all'}
-                    onValueChange={(value) => {
-                      setSelectedBrandsFilter(value === "all" ? [] : [value]);
-                    }}
-               >
-                 <SelectTrigger className="w-full text-base">
-                   <SelectValue placeholder="Filtra per Brand" />
-                 </SelectTrigger>
-                 <SelectContent>
-                   <SelectItem value="all">Tutti i Brand</SelectItem>
-                   {brands.map(br => (
-                     <SelectItem key={br} value={br}>
-                       {br}
-                     </SelectItem>
-                   ))}
-                 </SelectContent>
-               </Select>
+              <Combobox
+                items={brandItems}
+                value={selectedBrandsFilter.length === 1 ? selectedBrandsFilter[0] : "all"}
+                onChange={(value) => setSelectedBrandsFilter(value === "all" ? [] : [value])}
+                placeholder="Filtra per Brand"
+                inputPlaceholder="Cerca brand..."
+                emptyMessage="Nessun brand trovato."
+                className="text-base"
+                allowNew={false}
+              />
              </div>
            </Card>
 
@@ -530,10 +509,10 @@ function AiToolList() {
                       value={editedSummary}
                       onChange={e => setEditedSummary(e.target.value)}
                       rows={4}
-                      className="pr-12"
+                      className="pr-12" // Add padding to the right for the button
                     />
                     <Button
-                       type="button"
+                       type="button" // Important to prevent form submission if inside a form
                        variant="ghost"
                        size="icon"
                        className="absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-primary"

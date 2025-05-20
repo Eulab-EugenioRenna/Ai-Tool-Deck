@@ -2,6 +2,7 @@
 'use client';
 
 import {summarizeAiTool} from '@/ai/flows/ai-tool-summarization';
+import type {SummarizeAiToolOutput as GenkitSummarizeAiToolOutput} from '@/ai/flows/ai-tool-summarization';
 import {useEffect, useState, useCallback} from 'react';
 import PocketBase from 'pocketbase';
 import {
@@ -13,7 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {Textarea} from '@/components/ui/textarea';
-import {Edit, Trash, Loader2, RefreshCw, Search as SearchIcon} from 'lucide-react';
+import {Edit, Trash, Loader2, RefreshCw, Search as SearchIcon, RefreshCcwDot} from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,27 +37,22 @@ import { Combobox } from '@/components/ui/combobox';
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
+// Ensure local SummarizeAiToolOutput matches Genkit's, including optional derivedLink
+interface SummarizeAiToolOutput extends GenkitSummarizeAiToolOutput {
+  derivedLink?: string; 
+}
+
 interface AiTool {
   id: string;
   name: string;
   link?: string; 
-  category: string;
+  category: string; // User-provided category, AI can override in summary.category
   source: string;
   summary: SummarizeAiToolOutput; 
   deleted: boolean;
   brand?: string;
 }
 
-interface SummarizeAiToolOutput {
-  summary: string;
-  category: string;
-  tags: string[];
-  concepts: string[];
-  useCases: string[];
-  apiAvailable: boolean;
-  name: string;
-  derivedLink?: string;
-}
 
 function AiToolList() {
   const [aiTools, setAiTools] = useState<AiTool[]>([]);
@@ -91,12 +87,14 @@ function AiToolList() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isUpdatingAllTools, setIsUpdatingAllTools] = useState(false);
+
 
   const fetchAiTools = useCallback(async () => {
     try {
       const allRecords = await pb.collection('tools_ai').getFullList({
          filter: 'deleted = false',
-         fields: 'id,name,link,category,source,summary,deleted,brand',
+         fields: 'id,name,link,category,source,summary,deleted,brand', // Ensure all needed fields are fetched
          sort: '-created',
       });
 
@@ -106,7 +104,7 @@ function AiToolList() {
         link: record.link, 
         category: record.category, 
         source: record.source,
-        summary: record.summary as SummarizeAiToolOutput,
+        summary: record.summary as SummarizeAiToolOutput, // Cast to local interface
         deleted: record.deleted as boolean,
         brand: record.brand as string,
       }));
@@ -138,8 +136,9 @@ function AiToolList() {
     fetchAiTools();
     const unsubscribe = pb.collection('tools_ai').subscribe('*', function (e) {
       console.log('PocketBase subscription event:', e.action, e.record.id);
-       fetchAiTools();
+       fetchAiTools(); // Refetch on any change
     });
+     // Cleanup subscription on component unmount
      return () => {
        console.log('Unsubscribing from PocketBase');
        pb.collection('tools_ai').unsubscribe();
@@ -148,18 +147,22 @@ function AiToolList() {
 
   const filteredTools = aiTools.filter(tool => {
     const searchTermLower = search.toLowerCase();
-    const toolCategory = tool.summary?.category || tool.category; 
+    const toolCategory = tool.summary?.category || tool.category; // Prefer summary category
+    
+    // Category filter logic
     const categoryFilterMatch = selectedCategoryFilter
       ? toolCategory?.toLowerCase() === selectedCategoryFilter.toLowerCase()
       : true;
     
+    // Brand filter logic
     const brandFilterMatch = selectedBrandFilter 
       ? tool.brand?.toLowerCase() === selectedBrandFilter.toLowerCase()
       : true;
 
+    // Search term matching logic
     const matchesSearchTerm =
       tool.name?.toLowerCase().includes(searchTermLower) ||
-      (tool.summary?.derivedLink || tool.link)?.toLowerCase().includes(searchTermLower) ||
+      (tool.summary?.derivedLink || tool.link)?.toLowerCase().includes(searchTermLower) || // Check derivedLink first
       toolCategory?.toLowerCase().includes(searchTermLower) ||
       tool.source?.toLowerCase().includes(searchTermLower) ||
       tool.brand?.toLowerCase().includes(searchTermLower) ||
@@ -182,6 +185,7 @@ function AiToolList() {
       await pb.collection('tools_ai').update(deleteToolId, {
         deleted: true,
       });
+      // No need to call fetchAiTools here, subscription will handle it
       toast({
         title: 'Tool AI Eliminato!',
         description: 'Il tool AI è stato contrassegnato come eliminato.',
@@ -203,8 +207,8 @@ function AiToolList() {
   const handleEdit = (tool: AiTool) => {
     setEditTool(tool);
     setEditedName(tool.name || '');
-    setEditedLink(tool.summary?.derivedLink || tool.link || '');
-    setEditedCategory(tool.summary?.category || tool.category || '');
+    setEditedLink(tool.summary?.derivedLink || tool.link || ''); // Prefer derivedLink
+    setEditedCategory(tool.summary?.category || tool.category || ''); // Prefer summary category
     setEditedSource(tool.source || '');
     setEditedSummary(tool.summary?.summary || '');
     setEditedTags(tool.summary?.tags?.join(', ') || '');
@@ -219,19 +223,21 @@ function AiToolList() {
     if (!editTool) return;
     setIsRegenerating(true);
     try {
+      // Use current form values for regeneration
       const summaryOutput = await summarizeAiTool({
-        name: editedName,
-        link: editedLink, 
-        category: editedCategory, 
-        source: editedSource,
+        name: editedName, // Use edited name
+        link: editedLink, // Use edited link
+        category: editedCategory, // Use edited category as a hint
+        source: editedSource, // Use edited source
       });
+      // Update all relevant fields from the AI's output
       setEditedSummary(summaryOutput.summary);
-      setEditedCategory(summaryOutput.category);
+      setEditedCategory(summaryOutput.category); // AI's category
       setEditedTags(summaryOutput.tags.join(', '));
       setEditedConcepts(summaryOutput.concepts.join(', '));
       setEditedUseCases(summaryOutput.useCases.join(', '));
       setEditedApiAvailable(summaryOutput.apiAvailable);
-      setEditedLink(summaryOutput.derivedLink || editedLink); 
+      setEditedLink(summaryOutput.derivedLink || editedLink); // Update link if AI derived a better one
 
       toast({
         title: 'Riassunto Rigenerato!',
@@ -256,25 +262,26 @@ function AiToolList() {
     try {
       const updatedSummaryData: SummarizeAiToolOutput = {
         summary: editedSummary,
-        category: editedCategory,
+        category: editedCategory, // This is the category from the edit form
         tags: editedTags.split(',').map(tag => tag.trim()).filter(tag => tag),
         concepts: editedConcepts.split(',').map(concept => concept.trim()).filter(concept => concept),
         useCases: editedUseCases.split(',').map(useCase => useCase.trim()).filter(useCase => useCase),
         apiAvailable: editedApiAvailable,
-        name: editedName, 
-        derivedLink: editedLink, 
+        name: editedName, // Ensure name is part of summary for consistency if needed by AI
+        derivedLink: editedLink, // The link from the edit form
       };
 
       const dataToUpdate = {
         name: editedName,
-        link: editedLink, 
-        category: editedCategory, 
+        link: editedLink, // Save the potentially AI-derived or user-edited link
+        category: editedCategory, // This is the primary category field for the tool record
         source: editedSource,
-        summary: updatedSummaryData, 
+        summary: updatedSummaryData, // The complete summary object
         brand: editedBrand,
       };
 
       await pb.collection('tools_ai').update(editTool.id, dataToUpdate);
+      // No need to call fetchAiTools here, subscription will handle it
       setOpenEditDialog(false);
       toast({
         title: 'Tool AI Aggiornato!',
@@ -294,18 +301,19 @@ function AiToolList() {
   };
 
   const handleOpenFormModal = () => {
+    // Reset form fields
     setFormName('');
     setFormLink('');
-    setFormCategory('');
+    setFormCategory(''); // Reset category
     setFormSource('');
-    setFormBrand('');
+    setFormBrand(''); // Reset brand
     setOpenFormModal(true);
   };
 
   const handleSubmitNewTool = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    if (!formName || !formSource) {
+    if (!formName || !formSource) { // Basic validation
        toast({
          title: 'Campi Mancanti',
          description: 'Nome e Fonte sono obbligatori.',
@@ -315,28 +323,32 @@ function AiToolList() {
        return;
     }
     try {
+      // Call Genkit flow to summarize the tool
       const summaryOutput = await summarizeAiTool({
         name: formName,
         link: formLink,
-        category: formCategory, 
+        category: formCategory, // Pass user-provided category as a hint
         source: formSource,
       });
 
+      // Prepare data for PocketBase, ensuring summary is an object
        const dataToSave = {
-         name: summaryOutput.name, 
-         link: summaryOutput.derivedLink || formLink, 
-         category: summaryOutput.category, 
+         name: summaryOutput.name, // Use name from AI output for consistency
+         link: summaryOutput.derivedLink || formLink, // Prefer AI-derived link
+         category: summaryOutput.category, // Use AI-determined category as the primary one
          source: formSource,
-         summary: summaryOutput, 
+         summary: summaryOutput, // Save the whole summary object
          deleted: false,
          brand: formBrand,
        };
       await pb.collection('tools_ai').create(dataToSave);
+      // No need to call fetchAiTools here, subscription will handle it
       toast({
         title: 'Tool AI Aggiunto!',
         description: 'Il tool AI è stato aggiunto con successo e arricchito dall\'AI.',
       });
       setOpenFormModal(false);
+      // Optionally clear form fields after successful submission
        setFormName('');
        setFormLink('');
        setFormCategory('');
@@ -354,17 +366,82 @@ function AiToolList() {
         setIsSubmitting(false);
     }
   };
+
+  const handleUpdateAllToolsSummaries = async () => {
+    setIsUpdatingAllTools(true);
+    toast({ title: "Avvio aggiornamento massivo...", description: "Sto analizzando i tool." });
+    let updatedCount = 0;
+    let errorCount = 0;
+
+    try {
+      const allToolsToUpdate = await pb.collection('tools_ai').getFullList({
+        filter: 'deleted = false',
+      });
+
+      for (const toolRecord of allToolsToUpdate) {
+        const tool = toolRecord as unknown as AiTool; // Cast to AiTool
+        // Check if concepts are missing or summary is incomplete
+        if (!tool.summary?.concepts || !Array.isArray(tool.summary.concepts) || tool.summary.concepts.length === 0) {
+          try {
+            console.log(`Updating tool: ${tool.name} (ID: ${tool.id})`);
+            const summaryOutput = await summarizeAiTool({
+              name: tool.name,
+              link: tool.link || tool.summary?.derivedLink,
+              category: tool.category || tool.summary?.category,
+              source: tool.source,
+            });
+
+            const dataToUpdate = {
+              name: summaryOutput.name,
+              link: summaryOutput.derivedLink || tool.link,
+              category: summaryOutput.category,
+              source: tool.source,
+              summary: summaryOutput, // Save the whole new summary object
+              brand: tool.brand, // Preserve existing brand
+              deleted: tool.deleted,
+            };
+
+            await pb.collection('tools_ai').update(tool.id, dataToUpdate);
+            updatedCount++;
+          } catch (e: any) {
+            console.error(`Errore durante l'aggiornamento del tool ${tool.name} (ID: ${tool.id}):`, e);
+            errorCount++;
+          }
+        }
+      }
+      fetchAiTools(); // Refresh the list after all updates
+      toast({
+        title: "Aggiornamento Completato!",
+        description: `${updatedCount} tool aggiornati. ${errorCount > 0 ? `${errorCount} errori.` : ''}`,
+      });
+    } catch (error: any) {
+      console.error("Errore durante il processo di aggiornamento massivo:", error);
+      toast({
+        title: "Errore Aggiornamento Massivo",
+        description: "Si è verificato un errore durante il recupero dei tool o il processo generale.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingAllTools(false);
+    }
+  };
   
+  // Prepare items for Combobox components
   const categoryItems = [{ value: "all", label: "Tutte le Categorie" }, ...categories.map(cat => ({ value: cat, label: cat }))];
   const brandItems = [{ value: "all", label: "Tutti i Brand" }, ...brands.map(br => ({ value: br, label: br }))];
 
 
   return (
     <div>
-      <Navbar onAddToolClick={handleOpenFormModal} />
+      <Navbar 
+        onAddToolClick={handleOpenFormModal} 
+        onUpdateAllToolsClick={handleUpdateAllToolsSummaries}
+        isUpdatingAllTools={isUpdatingAllTools}
+      />
       <div className="container mx-auto p-4 md:p-6">
+        {/* Filters Section */}
         <section id="list">
-          <Card className="mb-8 p-4 md:p-6 shadow-md">
+          <Card className="mb-8 p-4 md:p-6 shadow-md"> {/* Added shadow for depth */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <div className="relative md:col-span-1">
                 <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -373,34 +450,37 @@ function AiToolList() {
                   placeholder="Cerca tool (nome, tag, concetti...)"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="pl-10 w-full text-base"
+                  className="pl-10 w-full text-base" // Slightly larger text
                 />
               </div>
 
+              {/* Category Filter Combobox */}
               <Combobox
                 items={categoryItems}
-                value={selectedCategoryFilter ?? "all"}
+                value={selectedCategoryFilter ?? "all"} // Handle null for "All"
                 onChange={(value) => setSelectedCategoryFilter(value === "all" ? null : value)}
                 placeholder="Filtra per Categoria"
                 inputPlaceholder="Cerca categoria..."
                 emptyMessage="Nessuna categoria trovata."
-                className="text-base"
-                allowNew={false} 
+                className="text-base" // Consistent text size
+                allowNew={false} // Assuming we don't want new categories from filter
               />
 
+              {/* Brand Filter Combobox */}
               <Combobox 
                 items={brandItems}
-                value={selectedBrandFilter ?? "all"}
+                value={selectedBrandFilter ?? "all"} // Handle null for "All"
                 onChange={(value) => setSelectedBrandFilter(value === "all" ? null : value)}
                 placeholder="Filtra per Brand"
                 inputPlaceholder="Cerca brand..."
                 emptyMessage="Nessun brand trovato."
-                className="text-base"
-                allowNew={false}
+                className="text-base" // Consistent text size
+                allowNew={false} // Assuming we don't want new brands from filter
               />
              </div>
            </Card>
 
+          {/* AI Tool Cards Masonry Grid */}
           <div className="masonry-grid">
             {filteredTools.length > 0 ? (
                  filteredTools.map(tool => (
@@ -408,6 +488,7 @@ function AiToolList() {
                      <Card className="break-inside-avoid shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg">
                        <CardHeader className="pb-3">
                          <CardTitle className="text-xl font-semibold hover:text-primary transition-colors">
+                           {/* Link the title if a link exists */}
                            {tool.summary?.derivedLink || tool.link ? (
                              <a href={tool.summary?.derivedLink || tool.link} target="_blank" rel="noopener noreferrer" title={`Visita ${tool.name}`}>
                                {tool.name}
@@ -422,7 +503,7 @@ function AiToolList() {
                          <p className="text-sm text-muted-foreground mb-3">
                            {tool.summary?.summary || 'Nessun riassunto disponibile.'}
                          </p>
-                         {/* Concepts and Use Cases removed from card display 
+                         {/* Concepts and Use Cases removed from direct card display for brevity 
                          {tool.summary?.concepts && tool.summary.concepts.length > 0 && (
                             <div className="mb-2">
                                <h4 className="text-xs font-semibold text-foreground mb-1">Concetti Chiave:</h4>
@@ -444,6 +525,7 @@ function AiToolList() {
                             </div>
                          )}
                          */}
+                         {/* Tags */}
                          <div className="mb-3 space-x-1 space-y-1">
                              {tool.summary?.tags?.map(tag => (
                                <Badge key={tag} variant="secondary" className="whitespace-nowrap text-xs">
@@ -451,6 +533,7 @@ function AiToolList() {
                                </Badge>
                              ))}
                          </div>
+                         {/* Brand and API Availability */}
                          <div className="text-xs text-muted-foreground mb-1">
                            <span className="font-semibold">Brand:</span> {tool.brand || 'N/D'}
                          </div>
@@ -459,7 +542,7 @@ function AiToolList() {
                            {tool.summary?.apiAvailable ? 'Sì' : 'No'}
                          </div>
                        </CardContent>
-                       <CardFooter className="flex justify-end space-x-2 pt-0 pb-3 px-4">
+                       <CardFooter className="flex justify-end space-x-2 pt-0 pb-3 px-4"> {/* Adjusted padding */}
                            <Button
                              size="icon"
                              variant="ghost"
@@ -491,12 +574,14 @@ function AiToolList() {
           </div>
         </section>
 
+        {/* Edit Tool Dialog */}
         <Dialog open={openEditDialog} onOpenChange={setOpenEditDialog}>
-          <DialogContent className="sm:max-w-lg"> 
+          <DialogContent className="sm:max-w-lg"> {/* Consider sm:max-w-xl for more space */}
             <DialogHeader>
               <DialogTitle className="text-xl">Modifica Tool AI</DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 py-4 px-4 max-h-[70vh] overflow-y-auto pr-2"> 
+            <div className="grid gap-4 py-4 px-4 max-h-[70vh] overflow-y-auto pr-2"> {/* Added px-4 for horizontal padding */}
+              {/* Form fields for editing */}
               <div className="grid gap-2">
                 <Label htmlFor="edit-name">Nome</Label>
                 <Input id="edit-name" value={editedName} onChange={e => setEditedName(e.target.value)} />
@@ -509,12 +594,12 @@ function AiToolList() {
                   <Label htmlFor="edit-category">Categoria</Label>
                   <Combobox
                     id="edit-category"
-                    items={categories.map(c => ({ value: c, label: c }))} 
+                    items={categories.map(c => ({ value: c, label: c }))} // Use dynamic categories
                     value={editedCategory}
                     onChange={setEditedCategory}
                     placeholder="Seleziona o crea categoria..."
                     inputPlaceholder="Cerca o crea categoria..."
-                    allowNew
+                    allowNew // Allow creating new categories
                   />
               </div>
               <div className="grid gap-2">
@@ -525,12 +610,12 @@ function AiToolList() {
                  <Label htmlFor="edit-brand">Brand</Label>
                   <Combobox
                     id="edit-brand"
-                    items={brands.map(b => ({ value: b, label: b }))} 
+                    items={brands.map(b => ({ value: b, label: b }))} // Use dynamic brands
                     value={editedBrand}
                     onChange={setEditedBrand}
                     placeholder="Seleziona o crea brand..."
                     inputPlaceholder="Cerca o crea brand..."
-                    allowNew
+                    allowNew // Allow creating new brands
                   />
               </div>
               <div className="grid gap-2">
@@ -541,10 +626,11 @@ function AiToolList() {
                       value={editedSummary}
                       onChange={e => setEditedSummary(e.target.value)}
                       rows={4}
-                      className="pr-12"
+                      className="pr-12" // Make space for the button
                     />
-                    <Button
-                       type="button"
+                    {/* Regenerate Button */}
+                     <Button
+                       type="button" // Important: type="button" to prevent form submission
                        variant="ghost"
                        size="icon"
                        className="absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-primary"
@@ -572,7 +658,7 @@ function AiToolList() {
                 <Checkbox
                   id="edit-apiAvailable"
                   checked={editedApiAvailable}
-                  onCheckedChange={(checked) => setEditedApiAvailable(Boolean(checked))}
+                  onCheckedChange={(checked) => setEditedApiAvailable(Boolean(checked))} // Ensure boolean value
                 />
                  <Label htmlFor="edit-apiAvailable" className="font-normal">API Disponibile</Label>
               </div>
@@ -588,6 +674,7 @@ function AiToolList() {
           </DialogContent>
         </Dialog>
 
+        {/* Delete Confirmation Dialog */}
         <AlertDialog open={openDeleteAlert} onOpenChange={setOpenDeleteAlert}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -605,12 +692,13 @@ function AiToolList() {
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Add New Tool Dialog (Modal) */}
         <Dialog open={openFormModal} onOpenChange={setOpenFormModal}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="text-xl">Aggiungi Nuovo Tool AI</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmitNewTool} className="grid gap-5 py-4 px-4">
+            <form onSubmit={handleSubmitNewTool} className="grid gap-5 py-4 px-4"> {/* Added px-4 */}
                <div className="grid gap-2">
                  <Label htmlFor="form-name">Nome del tool</Label>
                  <Input id="form-name" type="text" placeholder="Inserisci il nome..." value={formName} onChange={e => setFormName(e.target.value)} required />
@@ -623,12 +711,12 @@ function AiToolList() {
                  <Label htmlFor="form-category">Categoria (opzionale, l'AI la inferirà)</Label>
                   <Combobox
                     id="form-category"
-                    items={categories.map(c => ({ value: c, label: c }))}
+                    items={categories.map(c => ({ value: c, label: c }))} // Populate with existing categories
                     value={formCategory}
                     onChange={setFormCategory}
                     placeholder="Seleziona o crea categoria..."
                     inputPlaceholder="Cerca o crea categoria..."
-                    allowNew
+                    allowNew // Allow creating new categories
                   />
                </div>
                <div className="grid gap-2">
@@ -639,12 +727,12 @@ function AiToolList() {
                     <Label htmlFor="form-brand">Brand (opzionale)</Label>
                     <Combobox
                       id="form-brand"
-                      items={brands.map(b => ({ value: b, label: b }))}
+                      items={brands.map(b => ({ value: b, label: b }))} // Populate with existing brands
                       value={formBrand}
                       onChange={setFormBrand}
                       placeholder="Seleziona o crea brand..."
                       inputPlaceholder="Cerca o crea brand..."
-                      allowNew
+                      allowNew // Allow creating new brands
                     />
                 </div>
                  <DialogFooter>
@@ -667,4 +755,3 @@ export default function Home() {
   return <AiToolList />;
 }
 
-    

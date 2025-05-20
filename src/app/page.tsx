@@ -496,7 +496,7 @@ function AiToolList() {
             <DialogHeader>
               <DialogTitle className="text-xl">Modifica Tool AI</DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2"> 
+            <div className="grid gap-4 py-4 px-4 max-h-[70vh] overflow-y-auto pr-2"> 
               <div className="grid gap-2">
                 <Label htmlFor="edit-name">Nome</Label>
                 <Input id="edit-name" value={editedName} onChange={e => setEditedName(e.target.value)} />
@@ -610,7 +610,7 @@ function AiToolList() {
             <DialogHeader>
               <DialogTitle className="text-xl">Aggiungi Nuovo Tool AI</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmitNewTool} className="grid gap-5 py-4">
+            <form onSubmit={handleSubmitNewTool} className="grid gap-5 py-4 px-4">
                <div className="grid gap-2">
                  <Label htmlFor="form-name">Nome del tool</Label>
                  <Input id="form-name" type="text" placeholder="Inserisci il nome..." value={formName} onChange={e => setFormName(e.target.value)} required />

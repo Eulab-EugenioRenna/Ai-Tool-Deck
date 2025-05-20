@@ -62,7 +62,7 @@ function AiToolList() {
   const [aiTools, setAiTools] = useState<AiTool[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
-  const [selectedBrandFilter, setSelectedBrandFilter] = useState<string | null>(null); // Changed from string[]
+  const [selectedBrandFilter, setSelectedBrandFilter] = useState<string | null>(null); 
   const [categories, setCategories] = useState<string[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [openEditDialog, setOpenEditDialog] = useState(false);
@@ -153,7 +153,7 @@ function AiToolList() {
       ? toolCategory?.toLowerCase() === selectedCategoryFilter.toLowerCase()
       : true;
     
-    const brandFilterMatch = selectedBrandFilter // Updated logic for single brand filter
+    const brandFilterMatch = selectedBrandFilter 
       ? tool.brand?.toLowerCase() === selectedBrandFilter.toLowerCase()
       : true;
 
@@ -388,7 +388,7 @@ function AiToolList() {
                 allowNew={false} 
               />
 
-              <Combobox // Changed to Combobox for brand filter
+              <Combobox 
                 items={brandItems}
                 value={selectedBrandFilter ?? "all"}
                 onChange={(value) => setSelectedBrandFilter(value === "all" ? null : value)}
@@ -422,6 +422,7 @@ function AiToolList() {
                          <p className="text-sm text-muted-foreground mb-3">
                            {tool.summary?.summary || 'Nessun riassunto disponibile.'}
                          </p>
+                         {/* Concepts and Use Cases removed from card display 
                          {tool.summary?.concepts && tool.summary.concepts.length > 0 && (
                             <div className="mb-2">
                                <h4 className="text-xs font-semibold text-foreground mb-1">Concetti Chiave:</h4>
@@ -442,6 +443,7 @@ function AiToolList() {
                                </div>
                             </div>
                          )}
+                         */}
                          <div className="mb-3 space-x-1 space-y-1">
                              {tool.summary?.tags?.map(tag => (
                                <Badge key={tag} variant="secondary" className="whitespace-nowrap text-xs">

@@ -369,9 +369,10 @@ function AiToolList() {
 
   const handleUpdateAllToolsSummaries = async () => {
     setIsUpdatingAllTools(true);
-    toast({ title: "Avvio aggiornamento massivo...", description: "Sto analizzando i tool." });
+    toast({ title: "Avvio aggiornamento massivo...", description: "Sto analizzando i tool per aggiornare quelli privi di concetti chiave." });
     let updatedCount = 0;
     let errorCount = 0;
+    let toolsIdentifiedForUpdate = 0;
 
     try {
       const allToolsToUpdate = await pb.collection('tools_ai').getFullList({
@@ -379,9 +380,10 @@ function AiToolList() {
       });
 
       for (const toolRecord of allToolsToUpdate) {
-        const tool = toolRecord as unknown as AiTool; // Cast to AiTool
+        const tool = toolRecord as unknown as AiTool; 
         // Check if concepts are missing or summary is incomplete
         if (!tool.summary?.concepts || !Array.isArray(tool.summary.concepts) || tool.summary.concepts.length === 0) {
+          toolsIdentifiedForUpdate++;
           try {
             console.log(`Updating tool: ${tool.name} (ID: ${tool.id})`);
             const summaryOutput = await summarizeAiTool({
@@ -403,17 +405,43 @@ function AiToolList() {
 
             await pb.collection('tools_ai').update(tool.id, dataToUpdate);
             updatedCount++;
+            toast({
+              title: "Tool Aggiornato!",
+              description: `"${tool.name}" è stato aggiornato con i nuovi dettagli.`,
+            });
           } catch (e: any) {
             console.error(`Errore durante l'aggiornamento del tool ${tool.name} (ID: ${tool.id}):`, e);
             errorCount++;
+             toast({
+              title: "Errore Aggiornamento Tool",
+              description: `Impossibile aggiornare "${tool.name}": ${e.message || 'Dettagli non disponibili.'}`,
+              variant: 'destructive',
+            });
           }
         }
       }
-      fetchAiTools(); // Refresh the list after all updates
-      toast({
-        title: "Aggiornamento Completato!",
-        description: `${updatedCount} tool aggiornati. ${errorCount > 0 ? `${errorCount} errori.` : ''}`,
-      });
+      // fetchAiTools will be called by the PocketBase subscription upon successful updates.
+      // Or, if no updates were successful but errors occurred, or no tools needed update, the list remains as is.
+      // An explicit fetchAiTools() here might be redundant if subscriptions are working as expected for each update.
+      // If tools were updated, the subscription handles the refresh.
+
+      if (toolsIdentifiedForUpdate === 0 && allToolsToUpdate.length > 0) {
+        toast({
+          title: "Nessun Aggiornamento Necessario",
+          description: "Tutti i tool risultano già completi di concetti chiave.",
+        });
+      } else if (toolsIdentifiedForUpdate > 0) { 
+        toast({
+          title: "Processo di Aggiornamento Terminato",
+          description: `${updatedCount} tool aggiornati con successo. ${errorCount > 0 ? `${errorCount} presentano errori.` : 'Nessun errore.'}`,
+        });
+      } else if (allToolsToUpdate.length === 0) {
+         toast({
+          title: "Nessun Tool Trovato",
+          description: "Non ci sono tool da analizzare.",
+        });
+      }
+
     } catch (error: any) {
       console.error("Errore durante il processo di aggiornamento massivo:", error);
       toast({

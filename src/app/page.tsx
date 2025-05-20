@@ -39,15 +39,14 @@ const pb = new PocketBase('https://pocketbase.eulab.cloud');
 interface AiTool {
   id: string;
   name: string;
-  link?: string; // Made optional as it might be derived
+  link?: string; 
   category: string;
   source: string;
-  summary: SummarizeAiToolOutput; // This will store the full AI output
+  summary: SummarizeAiToolOutput; 
   deleted: boolean;
   brand?: string;
 }
 
-// Updated to match the richer output from the AI flow
 interface SummarizeAiToolOutput {
   summary: string;
   category: string;
@@ -63,7 +62,7 @@ function AiToolList() {
   const [aiTools, setAiTools] = useState<AiTool[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
-  const [selectedBrandsFilter, setSelectedBrandsFilter] = useState<string[]>([]);
+  const [selectedBrandFilter, setSelectedBrandFilter] = useState<string | null>(null); // Changed from string[]
   const [categories, setCategories] = useState<string[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [openEditDialog, setOpenEditDialog] = useState(false);
@@ -97,7 +96,6 @@ function AiToolList() {
     try {
       const allRecords = await pb.collection('tools_ai').getFullList({
          filter: 'deleted = false',
-         // Ensure all necessary fields, including the new summary object fields, are fetched
          fields: 'id,name,link,category,source,summary,deleted,brand',
          sort: '-created',
       });
@@ -105,10 +103,9 @@ function AiToolList() {
       const typedRecords = allRecords.map(record => ({
         id: record.id,
         name: record.name,
-        link: record.link, // This is the original link field from DB
-        category: record.category, // This is the original category from DB
+        link: record.link, 
+        category: record.category, 
         source: record.source,
-        // summary object is expected to be structured as SummarizeAiToolOutput
         summary: record.summary as SummarizeAiToolOutput,
         deleted: record.deleted as boolean,
         brand: record.brand as string,
@@ -119,7 +116,6 @@ function AiToolList() {
       const uniqueCategoriesSet = new Set<string>();
       const uniqueBrandsSet = new Set<string>();
       typedRecords.forEach(tool => {
-        // Use category from summary object if available, otherwise from tool's direct category
         const categoryToAdd = tool.summary?.category || tool.category;
         if (categoryToAdd) uniqueCategoriesSet.add(categoryToAdd);
         if (tool.brand) uniqueBrandsSet.add(tool.brand);
@@ -142,7 +138,6 @@ function AiToolList() {
     fetchAiTools();
     const unsubscribe = pb.collection('tools_ai').subscribe('*', function (e) {
       console.log('PocketBase subscription event:', e.action, e.record.id);
-       // A simple refetch is often easier to manage with complex data structures
        fetchAiTools();
     });
      return () => {
@@ -153,14 +148,15 @@ function AiToolList() {
 
   const filteredTools = aiTools.filter(tool => {
     const searchTermLower = search.toLowerCase();
-    const toolCategory = tool.summary?.category || tool.category; // Prefer summary's category
+    const toolCategory = tool.summary?.category || tool.category; 
     const categoryFilterMatch = selectedCategoryFilter
       ? toolCategory?.toLowerCase() === selectedCategoryFilter.toLowerCase()
       : true;
-    const brandFilterMatch =
-      selectedBrandsFilter.length > 0 ? selectedBrandsFilter.some(b => tool.brand?.toLowerCase() === b.toLowerCase()) : true;
+    
+    const brandFilterMatch = selectedBrandFilter // Updated logic for single brand filter
+      ? tool.brand?.toLowerCase() === selectedBrandFilter.toLowerCase()
+      : true;
 
-    // Enhanced search: include name, link, source, brand, and all fields within the summary object
     const matchesSearchTerm =
       tool.name?.toLowerCase().includes(searchTermLower) ||
       (tool.summary?.derivedLink || tool.link)?.toLowerCase().includes(searchTermLower) ||
@@ -207,9 +203,7 @@ function AiToolList() {
   const handleEdit = (tool: AiTool) => {
     setEditTool(tool);
     setEditedName(tool.name || '');
-    // Prefer derivedLink from summary, fallback to tool.link
     setEditedLink(tool.summary?.derivedLink || tool.link || '');
-    // Prefer category from summary, fallback to tool.category
     setEditedCategory(tool.summary?.category || tool.category || '');
     setEditedSource(tool.source || '');
     setEditedSummary(tool.summary?.summary || '');
@@ -225,21 +219,19 @@ function AiToolList() {
     if (!editTool) return;
     setIsRegenerating(true);
     try {
-      // Use current values from the edit form for regeneration
       const summaryOutput = await summarizeAiTool({
         name: editedName,
-        link: editedLink, // Use the potentially edited link
-        category: editedCategory, // Pass the potentially user-modified category
+        link: editedLink, 
+        category: editedCategory, 
         source: editedSource,
       });
-      // Update all relevant fields in the edit form with the new AI output
       setEditedSummary(summaryOutput.summary);
       setEditedCategory(summaryOutput.category);
       setEditedTags(summaryOutput.tags.join(', '));
       setEditedConcepts(summaryOutput.concepts.join(', '));
       setEditedUseCases(summaryOutput.useCases.join(', '));
       setEditedApiAvailable(summaryOutput.apiAvailable);
-      setEditedLink(summaryOutput.derivedLink || editedLink); // Update link if AI derived a better one
+      setEditedLink(summaryOutput.derivedLink || editedLink); 
 
       toast({
         title: 'Riassunto Rigenerato!',
@@ -269,16 +261,16 @@ function AiToolList() {
         concepts: editedConcepts.split(',').map(concept => concept.trim()).filter(concept => concept),
         useCases: editedUseCases.split(',').map(useCase => useCase.trim()).filter(useCase => useCase),
         apiAvailable: editedApiAvailable,
-        name: editedName, // Name from edit field
-        derivedLink: editedLink, // Link from edit field
+        name: editedName, 
+        derivedLink: editedLink, 
       };
 
       const dataToUpdate = {
         name: editedName,
-        link: editedLink, // Main link field
-        category: editedCategory, // Main category field, sync with summary
+        link: editedLink, 
+        category: editedCategory, 
         source: editedSource,
-        summary: updatedSummaryData, // Store the whole object
+        summary: updatedSummaryData, 
         brand: editedBrand,
       };
 
@@ -323,20 +315,19 @@ function AiToolList() {
        return;
     }
     try {
-      // Call AI to summarize and enrich the data
       const summaryOutput = await summarizeAiTool({
         name: formName,
         link: formLink,
-        category: formCategory, // User-provided category as a hint
+        category: formCategory, 
         source: formSource,
       });
 
        const dataToSave = {
-         name: summaryOutput.name, // Use name from AI output (should be same as input)
-         link: summaryOutput.derivedLink || formLink, // Prefer AI derived link
-         category: summaryOutput.category, // Use AI determined category
+         name: summaryOutput.name, 
+         link: summaryOutput.derivedLink || formLink, 
+         category: summaryOutput.category, 
          source: formSource,
-         summary: summaryOutput, // Store the whole enriched object
+         summary: summaryOutput, 
          deleted: false,
          brand: formBrand,
        };
@@ -346,7 +337,6 @@ function AiToolList() {
         description: 'Il tool AI è stato aggiunto con successo e arricchito dall\'AI.',
       });
       setOpenFormModal(false);
-       // Reset form fields
        setFormName('');
        setFormLink('');
        setFormCategory('');
@@ -395,37 +385,19 @@ function AiToolList() {
                 inputPlaceholder="Cerca categoria..."
                 emptyMessage="Nessuna categoria trovata."
                 className="text-base"
-                allowNew={false} // Do not allow creating new categories from filter
+                allowNew={false} 
               />
 
-              {/* For brand filter, we'll use multiple checkboxes for now for multi-select logic.
-                  A multi-select combobox is more complex. */}
-              <div>
-                <Label className="text-sm font-medium mb-1 block">Filtra per Brand:</Label>
-                 <div className="flex flex-wrap gap-2">
-                  {brands.map(brandName => (
-                    <Button
-                      key={brandName}
-                      variant={selectedBrandsFilter.includes(brandName) ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setSelectedBrandsFilter(prev =>
-                          prev.includes(brandName)
-                            ? prev.filter(b => b !== brandName)
-                            : [...prev, brandName]
-                        );
-                      }}
-                    >
-                      {brandName}
-                    </Button>
-                  ))}
-                  {selectedBrandsFilter.length > 0 && (
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedBrandsFilter([])}>
-                      Resetta Brand
-                    </Button>
-                  )}
-                </div>
-              </div>
+              <Combobox // Changed to Combobox for brand filter
+                items={brandItems}
+                value={selectedBrandFilter ?? "all"}
+                onChange={(value) => setSelectedBrandFilter(value === "all" ? null : value)}
+                placeholder="Filtra per Brand"
+                inputPlaceholder="Cerca brand..."
+                emptyMessage="Nessun brand trovato."
+                className="text-base"
+                allowNew={false}
+              />
              </div>
            </Card>
 
@@ -518,11 +490,11 @@ function AiToolList() {
         </section>
 
         <Dialog open={openEditDialog} onOpenChange={setOpenEditDialog}>
-          <DialogContent className="sm:max-w-lg"> {/* Increased max-width for more fields */}
+          <DialogContent className="sm:max-w-lg"> 
             <DialogHeader>
               <DialogTitle className="text-xl">Modifica Tool AI</DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2"> {/* Added scroll for long forms */}
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2"> 
               <div className="grid gap-2">
                 <Label htmlFor="edit-name">Nome</Label>
                 <Input id="edit-name" value={editedName} onChange={e => setEditedName(e.target.value)} />
@@ -535,7 +507,7 @@ function AiToolList() {
                   <Label htmlFor="edit-category">Categoria</Label>
                   <Combobox
                     id="edit-category"
-                    items={categories.map(c => ({ value: c, label: c }))} // Use dynamic categories from fetched tools
+                    items={categories.map(c => ({ value: c, label: c }))} 
                     value={editedCategory}
                     onChange={setEditedCategory}
                     placeholder="Seleziona o crea categoria..."
@@ -551,7 +523,7 @@ function AiToolList() {
                  <Label htmlFor="edit-brand">Brand</Label>
                   <Combobox
                     id="edit-brand"
-                    items={brands.map(b => ({ value: b, label: b }))} // Use dynamic brands
+                    items={brands.map(b => ({ value: b, label: b }))} 
                     value={editedBrand}
                     onChange={setEditedBrand}
                     placeholder="Seleziona o crea brand..."

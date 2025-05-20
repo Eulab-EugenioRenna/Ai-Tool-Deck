@@ -11,9 +11,9 @@ interface NavbarProps {
 
 export function Navbar({ onAddToolClick }: NavbarProps) {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
+    <header className="sticky top-0 z-50 w-full px-4 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="container flex h-16 max-w-screen-2xl items-center justify-between">
-        <Link href="/" className="flex items-center space-x-2 ml-2 md:ml-0"> {/* Added ml-2 for small screens, md:ml-0 to reset on medium+ */}
+        <Link href="/" className="flex items-center space-x-2 "> 
           <Bot className="h-6 w-6 text-primary" />
           <span className="font-bold text-lg text-foreground hover:text-primary transition-colors">
             AI Tool Deck

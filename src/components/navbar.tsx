@@ -3,22 +3,26 @@
 
 import {Button} from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle } from 'lucide-react'; // Import an icon
+import { PlusCircle, Bot } from 'lucide-react'; // Added Bot icon for logo
 
 interface NavbarProps {
-  onAddToolClick: () => void; // Callback function for adding a tool
+  onAddToolClick: () => void;
 }
-
 
 export function Navbar({ onAddToolClick }: NavbarProps) {
   return (
-    <nav className="bg-card border-b p-4 mb-6 flex justify-between items-center sticky top-0 z-40 shadow-sm">
-      <Link href="/" className="text-xl font-bold text-foreground hover:text-primary transition-colors">
-        AI Tool Deck
-      </Link>
-       <Button onClick={onAddToolClick} size="sm">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
+      <div className="container flex h-16 max-w-screen-2xl items-center justify-between">
+        <Link href="/" className="flex items-center space-x-2">
+          <Bot className="h-6 w-6 text-primary" />
+          <span className="font-bold text-lg text-foreground hover:text-primary transition-colors">
+            AI Tool Deck
+          </span>
+        </Link>
+        <Button onClick={onAddToolClick} size="sm">
           <PlusCircle className="mr-2 h-4 w-4" /> Aggiungi Tool
-       </Button>
-    </nav>
+        </Button>
+      </div>
+    </header>
   );
 }

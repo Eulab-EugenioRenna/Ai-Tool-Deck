@@ -34,6 +34,7 @@ import {Label} from '@/components/ui/label';
 import {toast} from '@/hooks/use-toast';
 import {Navbar} from '@/components/navbar';
 import { Combobox } from '@/components/ui/combobox';
+import { ImportDialog } from '@/components/import-dialog';
 
 const pb = new PocketBase('https://pocketbase.eulab.cloud');
 
@@ -88,6 +89,7 @@ function AiToolList() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isUpdatingAllTools, setIsUpdatingAllTools] = useState(false);
+  const [openImportDialog, setOpenImportDialog] = useState(false);
 
 
   const fetchAiTools = useCallback(async () => {
@@ -465,6 +467,7 @@ function AiToolList() {
         onAddToolClick={handleOpenFormModal} 
         onUpdateAllToolsClick={handleUpdateAllToolsSummaries}
         isUpdatingAllTools={isUpdatingAllTools}
+        onImportClick={() => setOpenImportDialog(true)}
       />
       <div className="container mx-auto p-4 md:p-6">
         {/* Filters Section */}
@@ -774,6 +777,12 @@ function AiToolList() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Import Dialog */}
+        <ImportDialog 
+          open={openImportDialog} 
+          onOpenChange={setOpenImportDialog} 
+        />
       </div>
     </div>
   );
@@ -782,4 +791,3 @@ function AiToolList() {
 export default function Home() {
   return <AiToolList />;
 }
-

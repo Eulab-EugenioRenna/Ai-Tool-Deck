@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { useBatchImport, ImportRecord, ImportError, ImportStatus } from '@/hooks/use-batch-import';
 import { Upload, FileText, AlertCircle, CheckCircle, XCircle, RefreshCw, X } from 'lucide-react';
@@ -22,6 +23,7 @@ type ImportStep = 'upload' | 'preview' | 'processing' | 'results';
 export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
   const [currentStep, setCurrentStep] = useState<ImportStep>('upload');
   const [records, setRecords] = useState<ImportRecord[]>([]);
+  const [selectedRecords, setSelectedRecords] = useState<Set<number>>(new Set());
   const [fileName, setFileName] = useState<string>('');
   const [processingLogs, setProcessingLogs] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,6 +33,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
   const resetDialog = useCallback(() => {
     setCurrentStep('upload');
     setRecords([]);
+    setSelectedRecords(new Set());
     setFileName('');
     setProcessingLogs([]);
     resetStatus();
@@ -102,6 +105,8 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
         }
 
         setRecords(parsedRecords);
+        // Seleziona automaticamente tutti i record
+        setSelectedRecords(new Set(parsedRecords.map((_, index) => index)));
         setCurrentStep('preview');
         
         toast({
@@ -145,7 +150,43 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
     }
   }, [handleFileSelect]);
 
+  // Funzioni per gestire la selezione dei record
+  const toggleRecordSelection = useCallback((index: number) => {
+    setSelectedRecords(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const selectAllRecords = useCallback(() => {
+    setSelectedRecords(new Set(records.map((_, index) => index)));
+  }, [records]);
+
+  const deselectAllRecords = useCallback(() => {
+    setSelectedRecords(new Set());
+  }, []);
+
+  const getSelectedRecords = useCallback(() => {
+    return Array.from(selectedRecords).map(index => records[index]);
+  }, [selectedRecords, records]);
+
   const startProcessing = useCallback(async () => {
+    const selectedRecordsToProcess = getSelectedRecords();
+    
+    if (selectedRecordsToProcess.length === 0) {
+      toast({
+        title: 'Nessun record selezionato',
+        description: 'Seleziona almeno un record da importare.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setCurrentStep('processing');
     setProcessingLogs([]);
     
@@ -157,7 +198,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
       }
       
       if (status.processed > 0) {
-        const lastProcessed = records[status.processed - 1];
+        const lastProcessed = selectedRecordsToProcess[status.processed - 1];
         const wasSuccessful = !status.failed.some(f => f.record === lastProcessed);
         
         if (wasSuccessful) {
@@ -172,7 +213,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
     };
 
     try {
-      await processBatch(records, onProgress);
+      await processBatch(selectedRecordsToProcess, onProgress);
       setCurrentStep('results');
     } catch (error: any) {
       console.error('Errore durante il processing:', error);
@@ -182,7 +223,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
         variant: 'destructive',
       });
     }
-  }, [records, processBatch, processingLogs]);
+  }, [selectedRecords, records, processBatch, processingLogs, getSelectedRecords]);
 
   const retryFailedRecords = useCallback(async () => {
     if (importStatus.failed.length === 0) return;
@@ -272,33 +313,54 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
   const renderPreviewStep = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Anteprima Dati</h3>
-        <Badge variant="secondary">{records.length} record</Badge>
+        <h3 className="text-lg font-semibold">Seleziona Record da Importare</h3>
+        <Badge variant="secondary">{selectedRecords.size}/{records.length} selezionati</Badge>
+      </div>
+      
+      <div className="flex items-center gap-2 mb-4">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={selectAllRecords}
+          disabled={selectedRecords.size === records.length}
+        >
+          Seleziona Tutto
+        </Button>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={deselectAllRecords}
+          disabled={selectedRecords.size === 0}
+        >
+          Deseleziona Tutto
+        </Button>
       </div>
       
       <Card>
         <CardHeader>
           <CardTitle className="text-base">File: {fileName}</CardTitle>
           <CardDescription>
-            Verifica i dati prima di procedere con l'importazione
+            Seleziona i record che vuoi importare utilizzando i checkbox
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-48">
+          <ScrollArea className="h-64">
             <div className="space-y-2">
-              {records.slice(0, 10).map((record, index) => (
-                <div key={index} className="flex items-center space-x-4 p-2 border rounded">
-                  <div className="font-medium">{record.nome}</div>
-                  <div className="text-sm text-muted-foreground flex-1 truncate">
-                    {record.link}
+              {records.map((record, index) => (
+                <div key={index} className="flex items-center space-x-3 p-3 border rounded hover:bg-muted/50 transition-colors">
+                  <Checkbox
+                    checked={selectedRecords.has(index)}
+                    onCheckedChange={() => toggleRecordSelection(index)}
+                    className="flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">{record.nome}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {record.link}
+                    </div>
                   </div>
                 </div>
               ))}
-              {records.length > 10 && (
-                <div className="text-sm text-muted-foreground text-center p-2">
-                  ... e altri {records.length - 10} record
-                </div>
-              )}
             </div>
           </ScrollArea>
         </CardContent>
@@ -421,8 +483,11 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
             <Button variant="outline" onClick={() => setCurrentStep('upload')}>
               Indietro
             </Button>
-            <Button onClick={startProcessing}>
-              Avvia Importazione ({records.length} record)
+            <Button 
+              onClick={startProcessing}
+              disabled={selectedRecords.size === 0}
+            >
+              Avvia Importazione ({selectedRecords.size} record)
             </Button>
           </DialogFooter>
         );

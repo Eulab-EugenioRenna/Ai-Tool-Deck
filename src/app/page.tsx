@@ -545,24 +545,44 @@ function AiToolList() {
     setIsFindingDuplicates(true);
     toast({ title: 'Ricerca duplicati in corso...' });
 
-    // Normalize names: lowercase and remove special chars/spaces
-    const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizeName = (str: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizeLink = (str: string) => (str || '').toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
 
+    // Group by normalized name first
     const toolsByName = new Map<string, AiTool[]>();
     aiTools.forEach(tool => {
-        const normalizedName = normalize(tool.name);
+        const normalizedName = normalizeName(tool.name);
         if (!toolsByName.has(normalizedName)) {
             toolsByName.set(normalizedName, []);
         }
         toolsByName.get(normalizedName)!.push(tool);
     });
-
+    
     const foundDuplicates: DuplicateGroup[] = [];
-    toolsByName.forEach((tools, key) => {
-        if (tools.length > 1) {
-            foundDuplicates.push({ key: `Nome: ${tools[0].name}`, tools });
+
+    // Then, within each name group, group by normalized link
+    toolsByName.forEach((toolsWithName) => {
+        if (toolsWithName.length > 1) { // Only check groups with potential duplicates
+            const toolsByLink = new Map<string, AiTool[]>();
+            toolsWithName.forEach(tool => {
+                const normalizedLink = normalizeLink(tool.summary?.derivedLink || tool.link || '');
+                if (!toolsByLink.has(normalizedLink)) {
+                    toolsByLink.set(normalizedLink, []);
+                }
+                toolsByLink.get(normalizedLink)!.push(tool);
+            });
+
+            toolsByLink.forEach((tools, linkKey) => {
+                if (tools.length > 1) {
+                    foundDuplicates.push({ 
+                        key: `Nome: ${tools[0].name} | Link: ${linkKey}`, 
+                        tools 
+                    });
+                }
+            });
         }
     });
+
 
     if (foundDuplicates.length === 0) {
       toast({

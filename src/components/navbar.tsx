@@ -3,16 +3,25 @@
 
 import {Button} from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, Bot, RefreshCcwDot, Upload } from 'lucide-react'; // Added Upload icon
+import { PlusCircle, Bot, RefreshCcwDot, Upload, FileCheck, Loader2 } from 'lucide-react'; // Changed CopySearch to FileCheck
 
 interface NavbarProps {
   onAddToolClick: () => void;
-  onUpdateAllToolsClick?: () => void; // Optional prop for the new button
-  isUpdatingAllTools?: boolean; // To disable the button during update
-  onImportClick?: () => void; // New prop for import functionality
+  onUpdateAllToolsClick?: () => void;
+  isUpdatingAllTools?: boolean;
+  onImportClick?: () => void;
+  onFindDuplicatesClick?: () => void; // New prop for duplicates
+  isFindingDuplicates?: boolean; // To disable button during search
 }
 
-export function Navbar({ onAddToolClick, onUpdateAllToolsClick, isUpdatingAllTools, onImportClick }: NavbarProps) {
+export function Navbar({ 
+  onAddToolClick, 
+  onUpdateAllToolsClick, 
+  isUpdatingAllTools, 
+  onImportClick,
+  onFindDuplicatesClick,
+  isFindingDuplicates
+}: NavbarProps) {
   return (
     <header className="sticky top-0 z-50 w-full px-4 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className=" flex h-16 gap-2 py-2 items-center justify-between">
@@ -44,6 +53,18 @@ export function Navbar({ onAddToolClick, onUpdateAllToolsClick, isUpdatingAllToo
               title="Importa tool da CSV/JSON"
             >
               <Upload className="h-4 w-4" />
+            </Button>
+          )}
+           {onFindDuplicatesClick && (
+            <Button 
+              onClick={onFindDuplicatesClick} 
+              size="icon" 
+              variant="ghost" 
+              className="text-muted-foreground hover:text-primary"
+              disabled={isFindingDuplicates}
+              title="Trova Tool Duplicati"
+            >
+              {isFindingDuplicates ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
             </Button>
           )}
           <Button onClick={onAddToolClick} size="sm" className="w-4 p-4">

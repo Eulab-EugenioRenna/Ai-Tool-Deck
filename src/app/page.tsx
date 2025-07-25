@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Search as SearchIcon,
   RefreshCcwDot,
+  CopySearch,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -48,6 +49,7 @@ import { toast } from "@/hooks/use-toast";
 import { Navbar } from "@/components/navbar";
 import { Combobox } from "@/components/ui/combobox";
 import { ImportDialog } from "@/components/import-dialog";
+import { DuplicatesDialog } from "@/components/duplicates-dialog";
 
 const pb = new PocketBase("https://pocketbase.eulab.cloud");
 
@@ -66,6 +68,12 @@ interface AiTool {
   deleted: boolean;
   brand?: string;
 }
+
+type DuplicateGroup = {
+  key: string;
+  tools: AiTool[];
+};
+
 
 function AiToolList() {
   const [aiTools, setAiTools] = useState<AiTool[]>([]);
@@ -106,6 +114,10 @@ function AiToolList() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isUpdatingAllTools, setIsUpdatingAllTools] = useState(false);
   const [openImportDialog, setOpenImportDialog] = useState(false);
+  
+  const [openDuplicatesDialog, setOpenDuplicatesDialog] = useState(false);
+  const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
+  const [isFindingDuplicates, setIsFindingDuplicates] = useState(false);
 
   const fetchAiTools = useCallback(async () => {
     try {
@@ -208,13 +220,15 @@ function AiToolList() {
     setOpenDeleteAlert(true);
   };
 
-  const handleDelete = async () => {
-    if (!deleteToolId) return;
+  const handleDelete = async (idToDelete?: string) => {
+    const finalId = idToDelete || deleteToolId;
+    if (!finalId) return;
+
     try {
-      await pb.collection("tools_ai").update(deleteToolId, {
+      await pb.collection("tools_ai").update(finalId, {
         deleted: true,
       });
-      // No need to call fetchAiTools here, subscription will handle it
+      
       toast({
         title: "Tool AI Eliminato!",
         description: "Il tool AI è stato contrassegnato come eliminato.",
@@ -230,10 +244,13 @@ function AiToolList() {
         variant: "destructive",
       });
     } finally {
-      setOpenDeleteAlert(false);
-      setDeleteToolId(null);
+        if (!idToDelete) { // Only close alert if it's the single delete flow
+            setOpenDeleteAlert(false);
+            setDeleteToolId(null);
+        }
     }
   };
+
 
   const handleEdit = (tool: AiTool) => {
     setEditTool(tool);
@@ -524,6 +541,64 @@ function AiToolList() {
     }
   };
 
+  const handleFindDuplicates = async () => {
+    setIsFindingDuplicates(true);
+    toast({ title: 'Ricerca duplicati in corso...' });
+
+    // Normalize names: lowercase and remove special chars/spaces
+    const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const toolsByName = new Map<string, AiTool[]>();
+    aiTools.forEach(tool => {
+        const normalizedName = normalize(tool.name);
+        if (!toolsByName.has(normalizedName)) {
+            toolsByName.set(normalizedName, []);
+        }
+        toolsByName.get(normalizedName)!.push(tool);
+    });
+
+    const foundDuplicates: DuplicateGroup[] = [];
+    toolsByName.forEach((tools, key) => {
+        if (tools.length > 1) {
+            foundDuplicates.push({ key: `Nome: ${tools[0].name}`, tools });
+        }
+    });
+
+    if (foundDuplicates.length === 0) {
+      toast({
+        title: 'Ricerca Completata',
+        description: 'Nessun duplicato trovato.',
+      });
+    } else {
+      setDuplicateGroups(foundDuplicates);
+      setOpenDuplicatesDialog(true);
+    }
+
+    setIsFindingDuplicates(false);
+  };
+  
+  const handleBatchDelete = async (toolIds: string[]) => {
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const id of toolIds) {
+        try {
+            await handleDelete(id);
+            successCount++;
+        } catch {
+            errorCount++;
+        }
+    }
+    
+    toast({
+        title: 'Eliminazione completata',
+        description: `${successCount} tool eliminati. ${errorCount > 0 ? `${errorCount} errori.` : ''}`,
+    });
+
+    // Close the dialog after deletion
+    setOpenDuplicatesDialog(false);
+  };
+
   // Prepare items for Combobox components
   const categoryItems = [
     { value: "all", label: "Tutte le Categorie" },
@@ -541,6 +616,8 @@ function AiToolList() {
         onUpdateAllToolsClick={handleUpdateAllToolsSummaries}
         isUpdatingAllTools={isUpdatingAllTools}
         onImportClick={() => setOpenImportDialog(true)}
+        onFindDuplicatesClick={handleFindDuplicates}
+        isFindingDuplicates={isFindingDuplicates}
       />
       <div className='container mx-auto p-4 md:p-6'>
         {/* Filters Section */}
@@ -878,7 +955,7 @@ function AiToolList() {
             <AlertDialogFooter>
               <AlertDialogCancel>Annulla</AlertDialogCancel>
               <AlertDialogAction
-                onClick={handleDelete}
+                onClick={() => handleDelete()}
                 className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
               >
                 Elimina
@@ -1010,6 +1087,15 @@ function AiToolList() {
           open={openImportDialog}
           onOpenChange={setOpenImportDialog}
         />
+        
+        {/* Duplicates Dialog */}
+        <DuplicatesDialog
+          open={openDuplicatesDialog}
+          onOpenChange={setOpenDuplicatesDialog}
+          duplicateGroups={duplicateGroups}
+          onDelete={handleBatchDelete}
+        />
+
       </div>
     </div>
   );

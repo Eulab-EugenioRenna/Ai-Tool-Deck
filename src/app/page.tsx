@@ -548,7 +548,9 @@ function AiToolList() {
     const normalizeName = (str: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const normalizeLink = (str: string) => (str || '').toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
 
-    // Group by normalized name first
+    const foundDuplicatesMap = new Map<string, DuplicateGroup>();
+
+    // Strategy 1: Group by normalized name, then find different links if name is the same
     const toolsByName = new Map<string, AiTool[]>();
     aiTools.forEach(tool => {
         const normalizedName = normalizeName(tool.name);
@@ -558,39 +560,77 @@ function AiToolList() {
         toolsByName.get(normalizedName)!.push(tool);
     });
     
-    const foundDuplicates: DuplicateGroup[] = [];
+    toolsByName.forEach((toolsWithName, nameKey) => {
+        if (toolsWithName.length > 1) {
+            const links = new Set(toolsWithName.map(t => normalizeLink(t.summary?.derivedLink || t.link || '')));
+            if (links.size > 1) { // Same name, different links -> potential duplicates
+                 const groupKey = `Nome Simile: "${toolsWithName[0].name}"`;
+                 if (!foundDuplicatesMap.has(groupKey)) {
+                     foundDuplicatesMap.set(groupKey, { key: groupKey, tools: [] });
+                 }
+                 foundDuplicatesMap.get(groupKey)!.tools.push(...toolsWithName);
+            }
+        }
+    });
 
-    // Then, within each name group, group by normalized link
-    toolsByName.forEach((toolsWithName) => {
-        if (toolsWithName.length > 1) { // Only check groups with potential duplicates
-            const toolsByLink = new Map<string, AiTool[]>();
-            toolsWithName.forEach(tool => {
-                const normalizedLink = normalizeLink(tool.summary?.derivedLink || tool.link || '');
-                if (!toolsByLink.has(normalizedLink)) {
-                    toolsByLink.set(normalizedLink, []);
-                }
-                toolsByLink.get(normalizedLink)!.push(tool);
-            });
+    // Strategy 2: Group by normalized link, find all tools with the same link
+    const toolsByLink = new Map<string, AiTool[]>();
+    aiTools.forEach(tool => {
+        const normalizedLink = normalizeLink(tool.summary?.derivedLink || tool.link || '');
+        if (normalizedLink) {
+            if (!toolsByLink.has(normalizedLink)) {
+                toolsByLink.set(normalizedLink, []);
+            }
+            toolsByLink.get(normalizedLink)!.push(tool);
+        }
+    });
 
-            toolsByLink.forEach((tools, linkKey) => {
-                if (tools.length > 1) {
-                    foundDuplicates.push({ 
-                        key: `Nome: ${tools[0].name} | Link: ${linkKey}`, 
-                        tools 
-                    });
+    toolsByLink.forEach((toolsWithLink, linkKey) => {
+        if (toolsWithLink.length > 1) {
+            const groupKey = `Link Uguale: "${linkKey}"`;
+            if (!foundDuplicatesMap.has(groupKey)) {
+                foundDuplicatesMap.set(groupKey, { key: groupKey, tools: [] });
+            }
+            // Add only those not already part of another group to avoid large confusing groups
+            toolsWithLink.forEach(tool => {
+                let alreadyAdded = false;
+                for (const group of foundDuplicatesMap.values()) {
+                    if (group.tools.some(t => t.id === tool.id)) {
+                        alreadyAdded = true;
+                        break;
+                    }
+                }
+                if (!alreadyAdded) {
+                    foundDuplicatesMap.get(groupKey)!.tools.push(tool);
                 }
             });
+             // If after filtering, the group is empty, remove it
+            if(foundDuplicatesMap.get(groupKey)?.tools.length === 0){
+                foundDuplicatesMap.delete(groupKey);
+            }
+        }
+    });
+    
+    // Final check for groups with more than one tool
+    const finalDuplicateGroups: DuplicateGroup[] = [];
+    foundDuplicatesMap.forEach((group, key) => {
+        if (group.tools.length > 1) {
+             // Deduplicate tools within the group by ID
+             const uniqueTools = Array.from(new Map(group.tools.map(t => [t.id, t])).values());
+             if (uniqueTools.length > 1) {
+                finalDuplicateGroups.push({ key: group.key, tools: uniqueTools });
+             }
         }
     });
 
 
-    if (foundDuplicates.length === 0) {
+    if (finalDuplicateGroups.length === 0) {
       toast({
         title: 'Ricerca Completata',
         description: 'Nessun duplicato trovato.',
       });
     } else {
-      setDuplicateGroups(foundDuplicates);
+      setDuplicateGroups(finalDuplicateGroups);
       setOpenDuplicatesDialog(true);
     }
 

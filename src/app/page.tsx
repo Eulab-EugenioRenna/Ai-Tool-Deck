@@ -54,6 +54,7 @@ import { DuplicatesDialog } from "@/components/duplicates-dialog";
 import { NormalizeDialog } from "@/components/normalize-dialog";
 
 const pb = new PocketBase("https://pocketbase.eulab.cloud");
+pb.autoCancellation(false)
 
 // Ensure local SummarizeAiToolOutput matches Genkit's, including optional derivedLink
 interface SummarizeAiToolOutput extends GenkitSummarizeAiToolOutput {

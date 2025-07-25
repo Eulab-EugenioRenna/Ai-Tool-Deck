@@ -29,7 +29,8 @@ const SummarizeAiToolOutputSchema = z.object({
   concepts: z.array(z.string()).describe('Concetti chiave, tecnologie correlate o problemi che lo strumento risolve (utile per la ricerca semantica). Ad esempio, per un tool RAG: "vector database", "document retrieval", "question answering".'),
   useCases: z.array(z.string()).describe('Possibili casi d\'uso dello strumento. Ad esempio: "customer support automation", "code generation", "content creation".'),
   apiAvailable: z.boolean().describe('Indica se lo strumento dispone di un’API.'),
-  name: z.string().describe('Il nome dello strumento AI.'),
+  name: z.string().describe('Il nome originale dello strumento AI.'),
+  normalizedName: z.string().describe('Il nome dello strumento AI, normalizzato e conciso (es. "Page Flows" invece di "UI/UX Design Inspiration for Apps and Websites — Page Flows").'),
   derivedLink: z.string().optional().describe('Il link al sito web o repository GitHub dello strumento AI, potenzialmente derivato dall\'analisi se non fornito inizialmente o se migliorato.'),
 });
 export type SummarizeAiToolOutput = z.infer<typeof SummarizeAiToolOutputSchema>;
@@ -59,11 +60,12 @@ const summarizeAiToolPrompt = ai.definePrompt({
       concepts: z.array(z.string()).describe('Elenco di 3-5 concetti chiave, tecnologie sottostanti, o problemi specifici che lo strumento affronta (es. "vector embeddings", "retrieval augmented generation", "natural language processing", "code completion", "image recognition", "data analysis automation"). Questi aiuteranno nella ricerca avanzata.'),
       useCases: z.array(z.string()).describe('Elenco di 2-3 casi d\'uso pratici e specifici per lo strumento (es. "generating marketing copy", "automating code reviews", "creating video storyboards", "translating technical documents", "analyzing customer feedback").'),
       apiAvailable: z.boolean().describe('Indica se lo strumento sembra disporre di un\'API (true/false), basandoti sulle informazioni disponibili. In caso di dubbio, metti false.'),
-      name: z.string().describe('Il nome dello strumento AI (deve corrispondere all\'input).'),
+      name: z.string().describe('Il nome originale fornito nell\'input, da restituire così com\'è.'),
+      normalizedName: z.string().describe('Il nome dello strumento AI, normalizzato per essere conciso e ufficiale. Analizza il titolo del sito, la descrizione e l\'URL per derivare il nome più pulito. Esempio: se il titolo è "UI/UX Design Inspiration for Apps and Websites — Page Flows", il nome normalizzato dovrebbe essere "Page Flows". Se il nome in input è già pulito, restituiscilo.'),
       derivedLink: z.string().optional().describe('Il link web primario e più rilevante per lo strumento, inferito dall\'analisi del sito/repo se il link fornito non era ottimale o mancante. Se il link fornito in input è valido e corretto, restituiscilo qui. Se non è possibile derivare un link valido, lascia questo campo vuoto.'),
     }),
   },
-  prompt: `Sei un agente AI esperto nella catalogazione e analisi dettagliata di strumenti di Intelligenza Artificiale. Il tuo compito è analizzare le informazioni fornite (nome, link potenziale, descrizione sito/repo) e restituire una scheda informativa completa e accurata **in lingua italiana**.
+  prompt: `Sei un agente AI esperto nella catalogazione e analisi dettagliata di strumenti di Intelligenza Artificiale. Il tuo compito è analizzare le informazioni fornite e restituire una scheda informativa completa e accurata **in lingua italiana**.
 
 Informazioni Disponibili sul Tool AI:
 Nome Fornito: {{name}}
@@ -75,16 +77,17 @@ Fonte di Scoperta: {{source}}
 {{#if websiteKeywords}}Parole Chiave Sito Web/Repo Analizzate: {{websiteKeywords}}{{/if}}
 
 Istruzioni Dettagliate per l'Output (formato JSON):
-1.  **name**: Restituisci il nome esatto fornito nell'input ("{{name}}").
-2.  **derivedLink**: Se il \`link\` fornito in input è valido e sembra essere il sito/repository ufficiale, restituiscilo. Se il \`link\` fornito è assente, o se dall'analisi del \`websiteTitle\` e \`websiteDescription\` emerge un link più pertinente (es. la homepage ufficiale invece di un articolo di blog), restituisci quello. Se non è possibile determinare un link affidabile, lascia questo campo vuoto o non includerlo.
-3.  **summary**: Genera un riepilogo conciso e informativo (massimo 3-4 righe, in italiano) che descriva lo scopo principale, le funzionalità chiave e il valore distintivo del tool.
-4.  **category**: Determina la categoria più specifica e appropriata (es. Devtools, Generative Art, RAG, Chatbot, Productivity, Coding, No-code, Workflow, Prompting, A2A, Text-to-Image, Text-to-Video, Speech-to-Text). Se una categoria è stata fornita dall'utente, usala come riferimento principale, altrimenti inferiscila accuratamente.
-5.  **tags**: Estrai o inferisci una lista di tag (massimo 5-7) concisi e altamente pertinenti (es. Open Source, API, SaaS, Freemium, LLM-based, GPT-4o, Gemini, Local First, Self-hosted, AI Agent, Multi-Modal, Beta). Evita tag troppo generici.
-6.  **concepts**: Identifica e lista 3-5 concetti chiave, tecnologie fondamentali o problemi specifici che lo strumento indirizza (es. "vector embeddings", "retrieval augmented generation", "natural language processing", "code completion", "image recognition", "sentiment analysis", "data visualization automation"). Questi devono essere utili per una ricerca "quasi-semantica".
-7.  **useCases**: Descrivi 2-3 casi d'uso pratici e specifici che illustrino come lo strumento può essere utilizzato (es. "generating Python code from natural language", "automating bug reporting from user feedback", "creating personalized learning paths", "translating legal contracts with high accuracy").
-8.  **apiAvailable**: Determina, basandoti sulle informazioni disponibili (descrizione, keywords, ecc.), se lo strumento offre un'API per sviluppatori (true/false). In caso di forte incertezza, considera \`false\`.
+1.  **name**: Restituisci il nome originale fornito nell'input: "{{name}}". Non modificarlo.
+2.  **normalizedName**: **Questa è la parte più importante.** Deriva il nome più conciso, pulito e ufficiale del tool. Usa il \`websiteTitle\`, l'URL e la descrizione per capire qual è il vero nome del brand o del prodotto. Ad esempio, se l'input \`name\` è "UI/UX Design Inspiration for Apps and Websites — Page Flows", il \`normalizedName\` corretto è "Page Flows". Se l'input \`name\` è già corretto (es. "Genkit"), restituiscilo così com'è.
+3.  **derivedLink**: Se il \`link\` fornito in input è valido e sembra essere il sito/repository ufficiale, restituiscilo. Se il \`link\` fornito è assente, o se dall'analisi emerge un link più pertinente (es. la homepage ufficiale invece di un articolo di blog), restituisci quello.
+4.  **summary**: Genera un riepilogo conciso (massimo 3-4 righe, in italiano) che descriva lo scopo principale del tool.
+5.  **category**: Determina la categoria più specifica e appropriata (es. Devtools, Generative Art, RAG, Productivity, ecc.). Se una categoria è fornita dall'utente, usala come riferimento principale, altrimenti inferiscila.
+6.  **tags**: Estrai o inferisci una lista di tag (massimo 5-7) concisi e pertinenti (es. Open Source, API, SaaS, Freemium, Local First, AI Agent).
+7.  **concepts**: Identifica 3-5 concetti chiave o problemi specifici che lo strumento affronta (es. "vector embeddings", "code completion", "image recognition").
+8.  **useCases**: Descrivi 2-3 casi d'uso pratici e specifici (es. "generating marketing copy", "automating code reviews").
+9.  **apiAvailable**: Determina se lo strumento offre un'API (true/false). In caso di incertezza, metti \`false\`.
 
-Fornisci l'output ESCLUSIVAMENTE nel formato JSON specificato dallo schema di output. Assicurati che tutti i campi testuali siano in italiano.
+Fornisci l'output ESCLUSIVAMENTE nel formato JSON specificato dallo schema. Assicurati che tutti i campi testuali siano in italiano.
 `,
 });
 
@@ -152,9 +155,8 @@ const summarizeAiToolFlow = ai.defineFlow<
       useCases: output?.useCases ?? [],
       apiAvailable: output?.apiAvailable ?? false,
       name: input.name,
+      normalizedName: output?.normalizedName ?? input.name,
       derivedLink: output?.derivedLink || input.link, // Prefer AI derived link, then original input link
     };
   }
 );
-
-    

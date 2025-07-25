@@ -1,3 +1,4 @@
+
 "use client";
 
 import { summarizeAiTool } from "@/ai/flows/ai-tool-summarization";
@@ -20,7 +21,7 @@ import {
   RefreshCw,
   Search as SearchIcon,
   RefreshCcwDot,
-  CopySearch,
+  FileCheck,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -50,6 +51,7 @@ import { Navbar } from "@/components/navbar";
 import { Combobox } from "@/components/ui/combobox";
 import { ImportDialog } from "@/components/import-dialog";
 import { DuplicatesDialog } from "@/components/duplicates-dialog";
+import { NormalizeDialog } from "@/components/normalize-dialog";
 
 const pb = new PocketBase("https://pocketbase.eulab.cloud");
 
@@ -118,6 +120,9 @@ function AiToolList() {
   const [openDuplicatesDialog, setOpenDuplicatesDialog] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
   const [isFindingDuplicates, setIsFindingDuplicates] = useState(false);
+
+  const [openNormalizeDialog, setOpenNormalizeDialog] = useState(false);
+  const [isNormalizing, setIsNormalizing] = useState(false);
 
   const fetchAiTools = useCallback(async () => {
     try {
@@ -279,6 +284,7 @@ function AiToolList() {
         source: editedSource, // Use edited source
       });
       // Update all relevant fields from the AI's output
+      setEditedName(summaryOutput.normalizedName); // Update name to normalized version
       setEditedSummary(summaryOutput.summary);
       setEditedCategory(summaryOutput.category); // AI's category
       setEditedTags(summaryOutput.tags.join(", "));
@@ -290,7 +296,7 @@ function AiToolList() {
       toast({
         title: "Riassunto Rigenerato!",
         description:
-          "Tutti i dettagli del tool (riassunto, categoria, tag, concetti, casi d'uso, API, link) sono stati aggiornati.",
+          "Tutti i dettagli del tool (nome, riassunto, categoria, tag, etc.) sono stati aggiornati.",
       });
     } catch (error: any) {
       console.error("Errore durante la rigenerazione del riassunto:", error);
@@ -312,6 +318,9 @@ function AiToolList() {
     setIsSubmitting(true);
     try {
       const updatedSummaryData: SummarizeAiToolOutput = {
+        // This is tricky, the original name is in summary.name, but the main record name is the one we edit.
+        // Let's assume the editedName is the one we want to save as the primary name.
+        // The AI flow is better used for generation, not manual updates.
         summary: editedSummary,
         category: editedCategory, // This is the category from the edit form
         tags: editedTags
@@ -327,7 +336,8 @@ function AiToolList() {
           .map((useCase) => useCase.trim())
           .filter((useCase) => useCase),
         apiAvailable: editedApiAvailable,
-        name: editedName, // Ensure name is part of summary for consistency if needed by AI
+        name: editTool.summary?.name || editTool.name, // Keep original name in summary block
+        normalizedName: editedName, // The user-edited name is the new "normalized" name
         derivedLink: editedLink, // The link from the edit form
       };
 
@@ -341,7 +351,6 @@ function AiToolList() {
       };
 
       await pb.collection("tools_ai").update(editTool.id, dataToUpdate);
-      // No need to call fetchAiTools here, subscription will handle it
       setOpenEditDialog(false);
       toast({
         title: "Tool AI Aggiornato!",
@@ -375,11 +384,11 @@ function AiToolList() {
   const handleSubmitNewTool = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    if (!formName || !formLink) {
+    if (!formName) {
       // Basic validation
       toast({
-        title: "Campi Mancanti",
-        description: "Nome e Link sono obbligatori.",
+        title: "Campo Mancante",
+        description: "Il Nome è obbligatorio.",
         variant: "destructive",
       });
       setIsSubmitting(false);
@@ -396,7 +405,7 @@ function AiToolList() {
 
       // Prepare data for PocketBase, ensuring summary is an object
       const dataToSave = {
-        name: summaryOutput.name, // Use name from AI output for consistency
+        name: summaryOutput.normalizedName, // Use AI-normalized name
         link: summaryOutput.derivedLink || formLink, // Prefer AI-derived link
         category: summaryOutput.category, // Use AI-determined category as the primary one
         source: formSource,
@@ -405,7 +414,6 @@ function AiToolList() {
         brand: formBrand,
       };
       await pb.collection("tools_ai").create(dataToSave);
-      // No need to call fetchAiTools here, subscription will handle it
       toast({
         title: "Tool AI Aggiunto!",
         description:
@@ -438,108 +446,106 @@ function AiToolList() {
     toast({
       title: "Avvio aggiornamento massivo...",
       description:
-        "Sto analizzando i tool per aggiornare quelli privi di concetti chiave.",
+        "Sto analizzando e normalizzando tutti i tool.",
     });
     let updatedCount = 0;
     let errorCount = 0;
-    let toolsIdentifiedForUpdate = 0;
-
+    
     try {
-      const allToolsToUpdate = await pb.collection("tools_ai").getFullList({
-        filter: "deleted = false",
-      });
+        const allToolsToUpdate = [...aiTools]; // Process all tools
 
-      for (const toolRecord of allToolsToUpdate) {
-        const tool = toolRecord as unknown as AiTool;
-        // Check if concepts are missing or summary is incomplete
-        if (
-          !tool.summary?.concepts ||
-          !Array.isArray(tool.summary.concepts) ||
-          tool.summary.concepts.length === 0
-        ) {
-          toolsIdentifiedForUpdate++;
-          try {
-            console.log(`Updating tool: ${tool.name} (ID: ${tool.id})`);
+        if (allToolsToUpdate.length === 0) {
+            toast({ title: "Nessun Tool Trovato", description: "Non ci sono tool da analizzare." });
+            setIsUpdatingAllTools(false);
+            return;
+        }
+
+        for (const tool of allToolsToUpdate) {
+            try {
+                console.log(`Updating tool: ${tool.name} (ID: ${tool.id})`);
+                const summaryOutput = await summarizeAiTool({
+                    name: tool.name, // Pass the current name
+                    link: tool.summary?.derivedLink || tool.link,
+                    category: tool.summary?.category || tool.category,
+                    source: tool.source,
+                });
+
+                const dataToUpdate = {
+                    name: summaryOutput.normalizedName, // Update the name with the normalized one
+                    link: summaryOutput.derivedLink || tool.link,
+                    category: summaryOutput.category,
+                    summary: summaryOutput, // Save the whole new summary object
+                    // Preserve other fields
+                    source: tool.source,
+                    brand: tool.brand,
+                    deleted: tool.deleted,
+                };
+
+                await pb.collection("tools_ai").update(tool.id, dataToUpdate);
+                updatedCount++;
+            } catch (e: any) {
+                console.error(`Errore durante l'aggiornamento del tool ${tool.name} (ID: ${tool.id}):`, e);
+                errorCount++;
+            }
+        }
+
+        toast({
+            title: "Processo di Normalizzazione Terminato",
+            description: `${updatedCount} tool aggiornati e normalizzati. ${errorCount > 0 ? `${errorCount} con errori.` : "Nessun errore."}`
+        });
+
+    } catch (error: any) {
+        console.error("Errore durante il processo di aggiornamento massivo:", error);
+        toast({
+            title: "Errore Aggiornamento Massivo",
+            description: "Si è verificato un errore durante il processo generale.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsUpdatingAllTools(false);
+    }
+};
+
+const handleBatchNormalize = async (toolIds: string[]) => {
+    setIsNormalizing(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    const toolsToNormalize = aiTools.filter(tool => toolIds.includes(tool.id));
+
+    for (const tool of toolsToNormalize) {
+        try {
             const summaryOutput = await summarizeAiTool({
-              name: tool.name,
-              link: tool.link || tool.summary?.derivedLink,
-              category: tool.category || tool.summary?.category,
-              source: tool.source,
+                name: tool.name,
+                link: tool.summary?.derivedLink || tool.link,
+                category: tool.summary?.category || tool.category,
+                source: tool.source,
             });
 
             const dataToUpdate = {
-              name: summaryOutput.name,
-              link: summaryOutput.derivedLink || tool.link,
-              category: summaryOutput.category,
-              source: tool.source,
-              summary: summaryOutput, // Save the whole new summary object
-              brand: tool.brand, // Preserve existing brand
-              deleted: tool.deleted,
+                name: summaryOutput.normalizedName,
+                link: summaryOutput.derivedLink || tool.link,
+                category: summaryOutput.category,
+                summary: summaryOutput,
             };
 
             await pb.collection("tools_ai").update(tool.id, dataToUpdate);
-            updatedCount++;
-            toast({
-              title: "Tool Aggiornato!",
-              description: `"${tool.name}" è stato aggiornato con i nuovi dettagli.`,
-            });
-          } catch (e: any) {
-            console.error(
-              `Errore durante l'aggiornamento del tool ${tool.name} (ID: ${tool.id}):`,
-              e
-            );
+            successCount++;
+        } catch (e) {
             errorCount++;
-            toast({
-              title: "Errore Aggiornamento Tool",
-              description: `Impossibile aggiornare "${tool.name}": ${
-                e.message || "Dettagli non disponibili."
-              }`,
-              variant: "destructive",
-            });
-          }
+            console.error(`Failed to normalize tool ${tool.id}:`, e);
         }
-      }
-      // fetchAiTools will be called by the PocketBase subscription upon successful updates.
-      // Or, if no updates were successful but errors occurred, or no tools needed update, the list remains as is.
-      // An explicit fetchAiTools() here might be redundant if subscriptions are working as expected for each update.
-      // If tools were updated, the subscription handles the refresh.
-
-      if (toolsIdentifiedForUpdate === 0 && allToolsToUpdate.length > 0) {
-        toast({
-          title: "Nessun Aggiornamento Necessario",
-          description:
-            "Tutti i tool risultano già completi di concetti chiave.",
-        });
-      } else if (toolsIdentifiedForUpdate > 0) {
-        toast({
-          title: "Processo di Aggiornamento Terminato",
-          description: `${updatedCount} tool aggiornati con successo. ${
-            errorCount > 0
-              ? `${errorCount} presentano errori.`
-              : "Nessun errore."
-          }`,
-        });
-      } else if (allToolsToUpdate.length === 0) {
-        toast({
-          title: "Nessun Tool Trovato",
-          description: "Non ci sono tool da analizzare.",
-        });
-      }
-    } catch (error: any) {
-      console.error(
-        "Errore durante il processo di aggiornamento massivo:",
-        error
-      );
-      toast({
-        title: "Errore Aggiornamento Massivo",
-        description:
-          "Si è verificato un errore durante il recupero dei tool o il processo generale.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUpdatingAllTools(false);
     }
-  };
+    
+    toast({
+        title: 'Normalizzazione completata',
+        description: `${successCount} tool normalizzati. ${errorCount > 0 ? `${errorCount} errori.` : ''}`,
+    });
+
+    setOpenNormalizeDialog(false);
+    setIsNormalizing(false);
+};
+
 
   const handleFindDuplicates = async () => {
     setIsFindingDuplicates(true);
@@ -550,30 +556,28 @@ function AiToolList() {
 
     const foundDuplicatesMap = new Map<string, DuplicateGroup>();
 
-    // Strategy 1: Group by normalized name, then find different links if name is the same
-    const toolsByName = new Map<string, AiTool[]>();
+    // Strategy 1: Group by normalized name AND normalized link
+    const toolsByCanonicalKey = new Map<string, AiTool[]>();
     aiTools.forEach(tool => {
-        const normalizedName = normalizeName(tool.name);
-        if (!toolsByName.has(normalizedName)) {
-            toolsByName.set(normalizedName, []);
+        const key = `${normalizeName(tool.name)}|${normalizeLink(tool.summary?.derivedLink || tool.link || '')}`;
+        if (!toolsByCanonicalKey.has(key)) {
+            toolsByCanonicalKey.set(key, []);
         }
-        toolsByName.get(normalizedName)!.push(tool);
+        toolsByCanonicalKey.get(key)!.push(tool);
     });
-    
-    toolsByName.forEach((toolsWithName, nameKey) => {
-        if (toolsWithName.length > 1) {
-            const links = new Set(toolsWithName.map(t => normalizeLink(t.summary?.derivedLink || t.link || '')));
-            if (links.size > 1) { // Same name, different links -> potential duplicates
-                 const groupKey = `Nome Simile: "${toolsWithName[0].name}"`;
-                 if (!foundDuplicatesMap.has(groupKey)) {
-                     foundDuplicatesMap.set(groupKey, { key: groupKey, tools: [] });
-                 }
-                 foundDuplicatesMap.get(groupKey)!.tools.push(...toolsWithName);
+
+    toolsByCanonicalKey.forEach((tools, key) => {
+        if (tools.length > 1) {
+            const groupKey = `Duplicato Esatto: "${tools[0].name}"`;
+            if (!foundDuplicatesMap.has(groupKey)) {
+                foundDuplicatesMap.set(groupKey, { key: groupKey, tools: [] });
             }
+            foundDuplicatesMap.get(groupKey)!.tools.push(...tools);
         }
     });
 
-    // Strategy 2: Group by normalized link, find all tools with the same link
+
+    // Strategy 2: Group by normalized link only, to find same link with different names
     const toolsByLink = new Map<string, AiTool[]>();
     aiTools.forEach(tool => {
         const normalizedLink = normalizeLink(tool.summary?.derivedLink || tool.link || '');
@@ -587,26 +591,30 @@ function AiToolList() {
 
     toolsByLink.forEach((toolsWithLink, linkKey) => {
         if (toolsWithLink.length > 1) {
-            const groupKey = `Link Uguale: "${linkKey}"`;
-            if (!foundDuplicatesMap.has(groupKey)) {
-                foundDuplicatesMap.set(groupKey, { key: groupKey, tools: [] });
-            }
-            // Add only those not already part of another group to avoid large confusing groups
-            toolsWithLink.forEach(tool => {
-                let alreadyAdded = false;
-                for (const group of foundDuplicatesMap.values()) {
-                    if (group.tools.some(t => t.id === tool.id)) {
-                        alreadyAdded = true;
-                        break;
+            const names = new Set(toolsWithLink.map(t => normalizeName(t.name)));
+            // Only add if there are different names for the same link
+            if (names.size > 1) {
+                const groupKey = `Link Uguale, Nomi Diversi: "${linkKey}"`;
+                if (!foundDuplicatesMap.has(groupKey)) {
+                    foundDuplicatesMap.set(groupKey, { key: groupKey, tools: [] });
+                }
+                
+                toolsWithLink.forEach(tool => {
+                    let alreadyAdded = false;
+                    for (const group of foundDuplicatesMap.values()) {
+                        if (group.tools.some(t => t.id === tool.id)) {
+                            alreadyAdded = true;
+                            break;
+                        }
                     }
+                    if (!alreadyAdded) {
+                        foundDuplicatesMap.get(groupKey)!.tools.push(tool);
+                    }
+                });
+
+                if(foundDuplicatesMap.get(groupKey)?.tools.length < 2){
+                    foundDuplicatesMap.delete(groupKey);
                 }
-                if (!alreadyAdded) {
-                    foundDuplicatesMap.get(groupKey)!.tools.push(tool);
-                }
-            });
-             // If after filtering, the group is empty, remove it
-            if(foundDuplicatesMap.get(groupKey)?.tools.length === 0){
-                foundDuplicatesMap.delete(groupKey);
             }
         }
     });
@@ -615,7 +623,6 @@ function AiToolList() {
     const finalDuplicateGroups: DuplicateGroup[] = [];
     foundDuplicatesMap.forEach((group, key) => {
         if (group.tools.length > 1) {
-             // Deduplicate tools within the group by ID
              const uniqueTools = Array.from(new Map(group.tools.map(t => [t.id, t])).values());
              if (uniqueTools.length > 1) {
                 finalDuplicateGroups.push({ key: group.key, tools: uniqueTools });
@@ -655,11 +662,9 @@ function AiToolList() {
         description: `${successCount} tool eliminati. ${errorCount > 0 ? `${errorCount} errori.` : ''}`,
     });
 
-    // Close the dialog after deletion
     setOpenDuplicatesDialog(false);
   };
 
-  // Prepare items for Combobox components
   const categoryItems = [
     { value: "all", label: "Tutte le Categorie" },
     ...categories.map((cat) => ({ value: cat, label: cat })),
@@ -678,13 +683,11 @@ function AiToolList() {
         onImportClick={() => setOpenImportDialog(true)}
         onFindDuplicatesClick={handleFindDuplicates}
         isFindingDuplicates={isFindingDuplicates}
+        onNormalizeClick={() => setOpenNormalizeDialog(true)}
       />
       <div className='container mx-auto p-4 md:p-6'>
-        {/* Filters Section */}
         <section id='list'>
           <Card className='mb-8 p-4 md:p-6 shadow-md'>
-            {" "}
-            {/* Added shadow for depth */}
             <div className='grid grid-cols-1 md:grid-cols-3 gap-4 items-center'>
               <div className='relative md:col-span-1'>
                 <SearchIcon className='absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground' />
@@ -693,41 +696,38 @@ function AiToolList() {
                   placeholder='Cerca tool (nome, tag, concetti...)'
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className='pl-10 w-full text-base' // Slightly larger text
+                  className='pl-10 w-full text-base'
                 />
               </div>
 
-              {/* Category Filter Combobox */}
               <Combobox
                 items={categoryItems}
-                value={selectedCategoryFilter ?? "all"} // Handle null for "All"
+                value={selectedCategoryFilter ?? "all"}
                 onChange={(value) =>
                   setSelectedCategoryFilter(value === "all" ? null : value)
                 }
                 placeholder='Filtra per Categoria'
                 inputPlaceholder='Cerca categoria...'
                 emptyMessage='Nessuna categoria trovata.'
-                className='text-base' // Consistent text size
-                allowNew={false} // Assuming we don't want new categories from filter
+                className='text-base'
+                allowNew={false}
               />
 
-              {/* Brand Filter Combobox */}
               <Combobox
                 items={brandItems}
-                value={selectedBrandFilter ?? "all"} // Handle null for "All"
+                value={selectedBrandFilter ?? "all"}
                 onChange={(value) =>
                   setSelectedBrandFilter(value === "all" ? null : value)
                 }
                 placeholder='Filtra per Brand'
                 inputPlaceholder='Cerca brand...'
                 emptyMessage='Nessun brand trovato.'
-                className='text-base' // Consistent text size
-                allowNew={false} // Assuming we don't want new brands from filter
+                className='text-base'
+                allowNew={false}
               />
             </div>
           </Card>
 
-          {/* AI Tool Cards Masonry Grid */}
           <div className='masonry-grid'>
             {filteredTools.length > 0 ? (
               filteredTools.map((tool) => (
@@ -738,10 +738,9 @@ function AiToolList() {
                   <Card className='break-inside-avoid shadow-lg hover:shadow-xl transition-shadow duration-300 rounded-lg'>
                     <CardHeader className='pb-3'>
                       <CardTitle className='text-xl font-semibold hover:text-primary transition-colors'>
-                        {/* Link the title if a link exists */}
                         {tool.summary?.derivedLink || tool.link ? (
                           <a
-                            href={tool.summary?.derivedLink || tool.link}
+                            href={tool.summary?.derivedLink || tool.link!}
                             target='_blank'
                             rel='noopener noreferrer'
                             title={`Visita ${tool.name}`}
@@ -761,29 +760,7 @@ function AiToolList() {
                         {tool.summary?.summary ||
                           "Nessun riassunto disponibile."}
                       </p>
-                      {/* Concepts and Use Cases removed from direct card display for brevity 
-                         {tool.summary?.concepts && tool.summary.concepts.length > 0 && (
-                            <div className="mb-2">
-                               <h4 className="text-xs font-semibold text-foreground mb-1">Concetti Chiave:</h4>
-                               <div className="space-x-1 space-y-1">
-                                {tool.summary.concepts.map(concept => (
-                                   <Badge key={concept} variant="outline" className="whitespace-nowrap text-xs">{concept}</Badge>
-                                ))}
-                               </div>
-                            </div>
-                         )}
-                         {tool.summary?.useCases && tool.summary.useCases.length > 0 && (
-                            <div className="mb-3">
-                               <h4 className="text-xs font-semibold text-foreground mb-1">Casi d'Uso:</h4>
-                               <div className="space-x-1 space-y-1">
-                                {tool.summary.useCases.map(useCase => (
-                                   <Badge key={useCase} variant="outline" className="whitespace-nowrap text-xs">{useCase}</Badge>
-                                ))}
-                               </div>
-                            </div>
-                         )}
-                         */}
-                      {/* Tags */}
+                      
                       <div className='mb-3 space-x-1 space-y-1'>
                         {tool.summary?.tags?.map((tag) => (
                           <Badge
@@ -795,7 +772,6 @@ function AiToolList() {
                           </Badge>
                         ))}
                       </div>
-                      {/* Brand and API Availability */}
                       <div className='text-xs text-muted-foreground mb-1'>
                         <span className='font-semibold'>Brand:</span>{" "}
                         {tool.brand || "N/D"}
@@ -806,8 +782,6 @@ function AiToolList() {
                       </div>
                     </CardContent>
                     <CardFooter className='flex justify-end space-x-2 pt-0 pb-3 px-4'>
-                      {" "}
-                      {/* Adjusted padding */}
                       <Button
                         size='icon'
                         variant='ghost'
@@ -843,21 +817,15 @@ function AiToolList() {
           </div>
         </section>
 
-        {/* Edit Tool Dialog */}
         <Dialog
           open={openEditDialog}
           onOpenChange={setOpenEditDialog}
         >
           <DialogContent className='sm:max-w-lg'>
-            {" "}
-            {/* Consider sm:max-w-xl for more space */}
             <DialogHeader>
               <DialogTitle className='text-xl'>Modifica Tool AI</DialogTitle>
             </DialogHeader>
             <div className='grid gap-4 py-4 px-4 max-h-[70vh] overflow-y-auto pr-2'>
-              {" "}
-              {/* Added px-4 for horizontal padding */}
-              {/* Form fields for editing */}
               <div className='grid gap-2'>
                 <Label htmlFor='edit-name'>Nome</Label>
                 <Input
@@ -878,12 +846,12 @@ function AiToolList() {
                 <Label htmlFor='edit-category'>Categoria</Label>
                 <Combobox
                   id='edit-category'
-                  items={categories.map((c) => ({ value: c, label: c }))} // Use dynamic categories
+                  items={categories.map((c) => ({ value: c, label: c }))}
                   value={editedCategory}
                   onChange={setEditedCategory}
                   placeholder='Seleziona o crea categoria...'
                   inputPlaceholder='Cerca o crea categoria...'
-                  allowNew // Allow creating new categories
+                  allowNew
                 />
               </div>
               <div className='grid gap-2'>
@@ -898,12 +866,12 @@ function AiToolList() {
                 <Label htmlFor='edit-brand'>Brand</Label>
                 <Combobox
                   id='edit-brand'
-                  items={brands.map((b) => ({ value: b, label: b }))} // Use dynamic brands
+                  items={brands.map((b) => ({ value: b, label: b }))}
                   value={editedBrand}
                   onChange={setEditedBrand}
                   placeholder='Seleziona o crea brand...'
                   inputPlaceholder='Cerca o crea brand...'
-                  allowNew // Allow creating new brands
+                  allowNew
                 />
               </div>
               <div className='grid gap-2'>
@@ -914,17 +882,16 @@ function AiToolList() {
                     value={editedSummary}
                     onChange={(e) => setEditedSummary(e.target.value)}
                     rows={4}
-                    className='pr-12' // Make space for the button
+                    className='pr-12'
                   />
-                  {/* Regenerate Button */}
                   <Button
-                    type='button' // Important: type="button" to prevent form submission
+                    type='button'
                     variant='ghost'
                     size='icon'
                     className='absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-primary'
                     onClick={handleRegenerateSummary}
                     disabled={isRegenerating || isSubmitting}
-                    title="Rigenera tutti i dettagli (Riassunto, Tags, Concetti, Casi d'uso, API, Link)"
+                    title="Rigenera tutti i dettagli (incluso nome, riassunto, tags...)"
                   >
                     {isRegenerating ? (
                       <Loader2 className='h-4 w-4 animate-spin' />
@@ -968,7 +935,7 @@ function AiToolList() {
                   checked={editedApiAvailable}
                   onCheckedChange={(checked) =>
                     setEditedApiAvailable(Boolean(checked))
-                  } // Ensure boolean value
+                  }
                 />
                 <Label
                   htmlFor='edit-apiAvailable'
@@ -999,7 +966,6 @@ function AiToolList() {
           </DialogContent>
         </Dialog>
 
-        {/* Delete Confirmation Dialog */}
         <AlertDialog
           open={openDeleteAlert}
           onOpenChange={setOpenDeleteAlert}
@@ -1024,7 +990,6 @@ function AiToolList() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Add New Tool Dialog (Modal) */}
         <Dialog
           open={openFormModal}
           onOpenChange={setOpenFormModal}
@@ -1039,8 +1004,6 @@ function AiToolList() {
               onSubmit={handleSubmitNewTool}
               className='grid gap-5 py-4 px-4'
             >
-              {" "}
-              {/* Added px-4 */}
               <div className='grid gap-2'>
                 <Label htmlFor='form-name'>Nome del tool</Label>
                 <Input
@@ -1065,18 +1028,9 @@ function AiToolList() {
                       ? formLink
                       : formLink
                       ? `https://${formLink}`
-                      : "https://"
+                      : ""
                   }
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value.startsWith("https://")) {
-                      setFormLink(value);
-                    } else if (value === "") {
-                      setFormLink("");
-                    } else {
-                      setFormLink(value.replace(/^https?:\/\//, ""));
-                    }
-                  }}
+                  onChange={(e) => setFormLink(e.target.value)}
                 />
               </div>
               <div className='grid gap-2'>
@@ -1085,12 +1039,12 @@ function AiToolList() {
                 </Label>
                 <Combobox
                   id='form-category'
-                  items={categories.map((c) => ({ value: c, label: c }))} // Populate with existing categories
+                  items={categories.map((c) => ({ value: c, label: c }))}
                   value={formCategory}
                   onChange={setFormCategory}
                   placeholder='Seleziona o crea categoria...'
                   inputPlaceholder='Cerca o crea categoria...'
-                  allowNew // Allow creating new categories
+                  allowNew
                 />
               </div>
               <div className='grid gap-2'>
@@ -1107,12 +1061,12 @@ function AiToolList() {
                 <Label htmlFor='form-brand'>Brand (opzionale)</Label>
                 <Combobox
                   id='form-brand'
-                  items={brands.map((b) => ({ value: b, label: b }))} // Populate with existing brands
+                  items={brands.map((b) => ({ value: b, label: b }))}
                   value={formBrand}
                   onChange={setFormBrand}
                   placeholder='Seleziona o crea brand...'
                   inputPlaceholder='Cerca o crea brand...'
-                  allowNew // Allow creating new brands
+                  allowNew
                 />
               </div>
               <DialogFooter>
@@ -1142,18 +1096,24 @@ function AiToolList() {
           </DialogContent>
         </Dialog>
 
-        {/* Import Dialog */}
         <ImportDialog
           open={openImportDialog}
           onOpenChange={setOpenImportDialog}
         />
         
-        {/* Duplicates Dialog */}
         <DuplicatesDialog
           open={openDuplicatesDialog}
           onOpenChange={setOpenDuplicatesDialog}
           duplicateGroups={duplicateGroups}
           onDelete={handleBatchDelete}
+        />
+
+        <NormalizeDialog
+            open={openNormalizeDialog}
+            onOpenChange={setOpenNormalizeDialog}
+            tools={aiTools}
+            onNormalize={handleBatchNormalize}
+            isNormalizing={isNormalizing}
         />
 
       </div>
@@ -1164,3 +1124,5 @@ function AiToolList() {
 export default function Home() {
   return <AiToolList />;
 }
+
+    

@@ -3,15 +3,16 @@
 
 import {Button} from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, Bot, RefreshCcwDot, Upload, FileCheck, Loader2 } from 'lucide-react'; // Changed CopySearch to FileCheck
+import { PlusCircle, Bot, RefreshCcwDot, Upload, FileCheck, Loader2, CaseSensitive } from 'lucide-react';
 
 interface NavbarProps {
   onAddToolClick: () => void;
   onUpdateAllToolsClick?: () => void;
   isUpdatingAllTools?: boolean;
   onImportClick?: () => void;
-  onFindDuplicatesClick?: () => void; // New prop for duplicates
-  isFindingDuplicates?: boolean; // To disable button during search
+  onFindDuplicatesClick?: () => void;
+  isFindingDuplicates?: boolean;
+  onNormalizeClick?: () => void; // New prop for normalization
 }
 
 export function Navbar({ 
@@ -20,7 +21,8 @@ export function Navbar({
   isUpdatingAllTools, 
   onImportClick,
   onFindDuplicatesClick,
-  isFindingDuplicates
+  isFindingDuplicates,
+  onNormalizeClick,
 }: NavbarProps) {
   return (
     <header className="sticky top-0 z-50 w-full px-4 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
@@ -39,7 +41,7 @@ export function Navbar({
               variant="ghost" 
               className="text-muted-foreground hover:text-primary"
               disabled={isUpdatingAllTools}
-              title="Aggiorna tutti i tool senza concetti chiave"
+              title="Aggiorna e normalizza tutti i tool"
             >
               {isUpdatingAllTools ? <RefreshCcwDot className="h-4 w-4 animate-spin" /> : <RefreshCcwDot className="h-4 w-4" />}
             </Button>
@@ -66,6 +68,17 @@ export function Navbar({
             >
               {isFindingDuplicates ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
             </Button>
+          )}
+          {onNormalizeClick && (
+              <Button
+                  onClick={onNormalizeClick}
+                  size="icon"
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-primary"
+                  title="Normalizza Nomi Selezionati"
+              >
+                  <CaseSensitive className="h-4 w-4" />
+              </Button>
           )}
           <Button onClick={onAddToolClick} size="sm" className="w-4 p-4">
             <PlusCircle className="h-4 w-4" /> 

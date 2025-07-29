@@ -444,24 +444,27 @@ function AiToolList() {
 
   const handleUpdateAllToolsSummaries = async () => {
     setIsUpdatingAllTools(true);
-    toast({
-      title: "Avvio aggiornamento massivo...",
-      description:
-        "Sto analizzando e normalizzando tutti i tool.",
-    });
+    
     let updatedCount = 0;
     let errorCount = 0;
     
     try {
-        const allToolsToUpdate = [...aiTools]; // Process all tools
+        const toolsToUpdate = aiTools.filter(tool => 
+            !tool.summary || !tool.summary.tags || tool.summary.tags.length === 0 || !tool.summary.concepts || tool.summary.concepts.length === 0
+        );
 
-        if (allToolsToUpdate.length === 0) {
-            toast({ title: "Nessun Tool Trovato", description: "Non ci sono tool da analizzare." });
+        if (toolsToUpdate.length === 0) {
+            toast({ title: "Nessun Tool da Aggiornare", description: "Tutti i tool sono già completi." });
             setIsUpdatingAllTools(false);
             return;
         }
 
-        for (const tool of allToolsToUpdate) {
+        toast({
+          title: "Avvio aggiornamento...",
+          description: `Trovati ${toolsToUpdate.length} tool da analizzare e normalizzare.`,
+        });
+
+        for (const tool of toolsToUpdate) {
             try {
                 console.log(`Updating tool: ${tool.name} (ID: ${tool.id})`);
                 const summaryOutput = await summarizeAiTool({
@@ -491,7 +494,7 @@ function AiToolList() {
         }
 
         toast({
-            title: "Processo di Normalizzazione Terminato",
+            title: "Processo di Aggiornamento Terminato",
             description: `${updatedCount} tool aggiornati e normalizzati. ${errorCount > 0 ? `${errorCount} con errori.` : "Nessun errore."}`
         });
 

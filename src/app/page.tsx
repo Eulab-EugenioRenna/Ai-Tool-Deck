@@ -3,7 +3,7 @@
 
 import { summarizeAiTool } from "@/ai/flows/ai-tool-summarization";
 import type { SummarizeAiToolOutput as GenkitSummarizeAiToolOutput } from "@/ai/flows/ai-tool-summarization";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, ReactElement, useState, useCallback, useRef } from "react";
 import PocketBase from "pocketbase";
 import {
   Dialog,
@@ -54,7 +54,8 @@ import { DuplicatesDialog } from "@/components/duplicates-dialog";
 import { NormalizeDialog } from "@/components/normalize-dialog";
 
 const pb = new PocketBase("https://pocketbase.eulab.cloud");
-pb.autoCancellation(false)
+// Disabilita la cancellazione automatica globale per gestire manualmente le richieste pendenti
+pb.autoCancellation(false);
 
 // Ensure local SummarizeAiToolOutput matches Genkit's, including optional derivedLink
 interface SummarizeAiToolOutput extends GenkitSummarizeAiToolOutput {
@@ -65,7 +66,7 @@ interface AiTool {
   id: string;
   name: string;
   link?: string;
-  category: string; // User-provided category, AI can override in summary.category
+  category: string;
   source: string;
   summary: SummarizeAiToolOutput;
   deleted: boolean;
@@ -125,11 +126,14 @@ function AiToolList() {
   const [openNormalizeDialog, setOpenNormalizeDialog] = useState(false);
   const [isNormalizing, setIsNormalizing] = useState(false);
 
+  // Utilizziamo un ref per gestire correttamente lo stato della sottoscrizione ed evitare duplicati
+  const isSubscribedRef = useRef(false);
+
   const fetchAiTools = useCallback(async () => {
     try {
       const allRecords = await pb.collection("tools_ai").getFullList({
         filter: "deleted = false",
-        fields: "id,name,link,category,source,summary,deleted,brand", // Ensure all needed fields are fetched
+        fields: "id,name,link,category,source,summary,deleted,brand",
         sort: "-created",
       });
 
@@ -139,7 +143,7 @@ function AiToolList() {
         link: record.link,
         category: record.category,
         source: record.source,
-        summary: record.summary as SummarizeAiToolOutput, // Cast to local interface
+        summary: record.summary as SummarizeAiToolOutput,
         deleted: record.deleted as boolean,
         brand: record.brand as string,
       }));
@@ -156,51 +160,66 @@ function AiToolList() {
       setCategories(Array.from(uniqueCategoriesSet).sort());
       setBrands(Array.from(uniqueBrandsSet).sort());
     } catch (error: any) {
+      // Ignora l'errore se la chiamata è stata cancellata o se il componente non è più montato
+      if (error?.isAbort) return;
       console.error("Error fetching AI tools:", error);
-      toast({
-        title: "Errore",
-        description:
-          error?.data?.message ||
-          error?.message ||
-          "Impossibile recuperare i tool AI. Riprova.",
-        variant: "destructive",
-      });
     }
   }, []);
 
   useEffect(() => {
-    fetchAiTools();
-    const unsubscribe = pb.collection("tools_ai").subscribe("*", function (e) {
-      console.log("PocketBase subscription event:", e.action, e.record.id);
-      fetchAiTools(); // Refetch on any change
-    });
-    // Cleanup subscription on component unmount
+    let mounted = true;
+
+    const initializeData = async () => {
+      // Prima chiamata GET: solo se montato
+      if (mounted) {
+        await fetchAiTools();
+      }
+
+      // Sottoscrizione Realtime: una sola volta per ciclo di vita
+      if (mounted && !isSubscribedRef.current) {
+        try {
+          await pb.collection("tools_ai").subscribe("*", (e) => {
+            if (mounted) {
+              console.log("PocketBase subscription event:", e.action, e.record.id);
+              fetchAiTools();
+            }
+          });
+          isSubscribedRef.current = true;
+        } catch (err) {
+          console.error("Subscription error:", err);
+        }
+      }
+    };
+
+    initializeData();
+
     return () => {
-      console.log("Unsubscribing from PocketBase");
-      pb.collection("tools_ai").unsubscribe();
+      mounted = false;
+      // Pulizia totale della sottoscrizione quando il componente viene smontato
+      if (isSubscribedRef.current) {
+        pb.collection("tools_ai").unsubscribe("*");
+        isSubscribedRef.current = false;
+      }
     };
   }, [fetchAiTools]);
 
   const filteredTools = aiTools.filter((tool) => {
     const searchTermLower = search.toLowerCase();
-    const toolCategory = tool.summary?.category || tool.category; // Prefer summary category
+    const toolCategory = tool.summary?.category || tool.category;
 
-    // Category filter logic
     const categoryFilterMatch = selectedCategoryFilter
       ? toolCategory?.toLowerCase() === selectedCategoryFilter.toLowerCase()
       : true;
 
-    // Brand filter logic
     const brandFilterMatch = selectedBrandFilter
       ? tool.brand?.toLowerCase() === selectedBrandFilter.toLowerCase()
       : true;
 
-    // Search term matching logic
     const matchesSearchTerm =
       tool.name?.toLowerCase().includes(searchTermLower) ||
       (tool.summary?.derivedLink || tool.link)
         ?.toLowerCase()
-        .includes(searchTermLower) || // Check derivedLink first
+        .includes(searchTermLower) ||
       toolCategory?.toLowerCase().includes(searchTermLower) ||
       tool.source?.toLowerCase().includes(searchTermLower) ||
       tool.brand?.toLowerCase().includes(searchTermLower) ||
@@ -250,7 +269,7 @@ function AiToolList() {
         variant: "destructive",
       });
     } finally {
-        if (!idToDelete) { // Only close alert if it's the single delete flow
+        if (!idToDelete) {
             setOpenDeleteAlert(false);
             setDeleteToolId(null);
         }
@@ -261,8 +280,8 @@ function AiToolList() {
   const handleEdit = (tool: AiTool) => {
     setEditTool(tool);
     setEditedName(tool.name || "");
-    setEditedLink(tool.summary?.derivedLink || tool.link || ""); // Prefer derivedLink
-    setEditedCategory(tool.summary?.category || tool.category || ""); // Prefer summary category
+    setEditedLink(tool.summary?.derivedLink || tool.link || "");
+    setEditedCategory(tool.summary?.category || tool.category || "");
     setEditedSource(tool.source || "");
     setEditedSummary(tool.summary?.summary || "");
     setEditedTags(tool.summary?.tags?.join(", ") || "");
@@ -277,27 +296,25 @@ function AiToolList() {
     if (!editTool) return;
     setIsRegenerating(true);
     try {
-      // Use current form values for regeneration
       const summaryOutput = await summarizeAiTool({
-        name: editedName, // Use edited name
-        link: editedLink, // Use edited link
-        category: editedCategory, // Use edited category as a hint
-        source: editedSource, // Use edited source
+        name: editedName,
+        link: editedLink,
+        category: editedCategory,
+        source: editedSource,
       });
-      // Update all relevant fields from the AI's output
-      setEditedName(summaryOutput.normalizedName); // Update name to normalized version
+      setEditedName(summaryOutput.normalizedName);
       setEditedSummary(summaryOutput.summary);
-      setEditedCategory(summaryOutput.category); // AI's category
+      setEditedCategory(summaryOutput.category);
       setEditedTags(summaryOutput.tags.join(", "));
       setEditedConcepts(summaryOutput.concepts.join(", "));
       setEditedUseCases(summaryOutput.useCases.join(", "));
       setEditedApiAvailable(summaryOutput.apiAvailable);
-      setEditedLink(summaryOutput.derivedLink || editedLink); // Update link if AI derived a better one
+      setEditedLink(summaryOutput.derivedLink || editedLink);
 
       toast({
         title: "Riassunto Rigenerato!",
         description:
-          "Tutti i dettagli del tool (nome, riassunto, categoria, tag, etc.) sono stati aggiornati.",
+          "Tutti i dettagli del tool sono stati aggiornati.",
       });
     } catch (error: any) {
       console.error("Errore durante la rigenerazione del riassunto:", error);
@@ -319,11 +336,8 @@ function AiToolList() {
     setIsSubmitting(true);
     try {
       const updatedSummaryData: SummarizeAiToolOutput = {
-        // This is tricky, the original name is in summary.name, but the main record name is the one we edit.
-        // Let's assume the editedName is the one we want to save as the primary name.
-        // The AI flow is better used for generation, not manual updates.
         summary: editedSummary,
-        category: editedCategory, // This is the category from the edit form
+        category: editedCategory,
         tags: editedTags
           .split(",")
           .map((tag) => tag.trim())
@@ -337,17 +351,17 @@ function AiToolList() {
           .map((useCase) => useCase.trim())
           .filter((useCase) => useCase),
         apiAvailable: editedApiAvailable,
-        name: editTool.summary?.name || editTool.name, // Keep original name in summary block
-        normalizedName: editedName, // The user-edited name is the new "normalized" name
-        derivedLink: editedLink, // The link from the edit form
+        name: editTool.summary?.name || editTool.name,
+        normalizedName: editedName,
+        derivedLink: editedLink,
       };
 
       const dataToUpdate = {
         name: editedName,
-        link: editedLink, // Save the potentially AI-derived or user-edited link
-        category: editedCategory, // This is the primary category field for the tool record
+        link: editedLink,
+        category: editedCategory,
         source: editedSource,
-        summary: updatedSummaryData, // The complete summary object
+        summary: updatedSummaryData,
         brand: editedBrand,
       };
 
@@ -373,12 +387,11 @@ function AiToolList() {
   };
 
   const handleOpenFormModal = () => {
-    // Reset form fields
     setFormName("");
     setFormLink("");
-    setFormCategory(""); // Reset category
+    setFormCategory("");
     setFormSource("");
-    setFormBrand(""); // Reset brand
+    setFormBrand("");
     setOpenFormModal(true);
   };
 
@@ -386,7 +399,6 @@ function AiToolList() {
     e.preventDefault();
     setIsSubmitting(true);
     if (!formName) {
-      // Basic validation
       toast({
         title: "Campo Mancante",
         description: "Il Nome è obbligatorio.",
@@ -396,21 +408,19 @@ function AiToolList() {
       return;
     }
     try {
-      // Call Genkit flow to summarize the tool
       const summaryOutput = await summarizeAiTool({
         name: formName,
         link: formLink,
-        category: formCategory, // Pass user-provided category as a hint
+        category: formCategory,
         source: formSource,
       });
 
-      // Prepare data for PocketBase, ensuring summary is an object
       const dataToSave = {
-        name: summaryOutput.normalizedName, // Use AI-normalized name
-        link: summaryOutput.derivedLink || formLink, // Prefer AI-derived link
-        category: summaryOutput.category, // Use AI-determined category as the primary one
+        name: summaryOutput.normalizedName,
+        link: summaryOutput.derivedLink || formLink,
+        category: summaryOutput.category,
         source: formSource,
-        summary: summaryOutput, // Save the whole summary object
+        summary: summaryOutput,
         deleted: false,
         brand: formBrand,
       };
@@ -421,7 +431,6 @@ function AiToolList() {
           "Il tool AI è stato aggiunto con successo e arricchito dall'AI.",
       });
       setOpenFormModal(false);
-      // Optionally clear form fields after successful submission
       setFormName("");
       setFormLink("");
       setFormCategory("");
@@ -461,25 +470,23 @@ function AiToolList() {
 
         toast({
           title: "Avvio aggiornamento...",
-          description: `Trovati ${toolsToUpdate.length} tool da analizzare e normalizzare.`,
+          description: `Trovati ${toolsToUpdate.length} tool incompleti da analizzare.`,
         });
 
         for (const tool of toolsToUpdate) {
             try {
-                console.log(`Updating tool: ${tool.name} (ID: ${tool.id})`);
                 const summaryOutput = await summarizeAiTool({
-                    name: tool.name, // Pass the current name
+                    name: tool.name,
                     link: tool.summary?.derivedLink || tool.link,
                     category: tool.summary?.category || tool.category,
                     source: tool.source,
                 });
 
                 const dataToUpdate = {
-                    name: summaryOutput.normalizedName, // Update the name with the normalized one
+                    name: summaryOutput.normalizedName,
                     link: summaryOutput.derivedLink || tool.link,
                     category: summaryOutput.category,
-                    summary: summaryOutput, // Save the whole new summary object
-                    // Preserve other fields
+                    summary: summaryOutput,
                     source: tool.source,
                     brand: tool.brand,
                     deleted: tool.deleted,
@@ -488,21 +495,21 @@ function AiToolList() {
                 await pb.collection("tools_ai").update(tool.id, dataToUpdate);
                 updatedCount++;
             } catch (e: any) {
-                console.error(`Errore durante l'aggiornamento del tool ${tool.name} (ID: ${tool.id}):`, e);
+                console.error(`Errore durante l'aggiornamento del tool ${tool.name}:`, e);
                 errorCount++;
             }
         }
 
         toast({
             title: "Processo di Aggiornamento Terminato",
-            description: `${updatedCount} tool aggiornati e normalizzati. ${errorCount > 0 ? `${errorCount} con errori.` : "Nessun errore."}`
+            description: `${updatedCount} tool aggiornati. ${errorCount > 0 ? `${errorCount} con errori.` : "Nessun errore."}`
         });
 
     } catch (error: any) {
         console.error("Errore durante il processo di aggiornamento massivo:", error);
         toast({
             title: "Errore Aggiornamento Massivo",
-            description: "Si è verificato un errore durante il processo generale.",
+            description: "Si è verificato un errore durante il processo.",
             variant: "destructive",
         });
     } finally {
@@ -560,7 +567,6 @@ const handleBatchNormalize = async (toolIds: string[]) => {
 
     const foundDuplicatesMap = new Map<string, DuplicateGroup>();
 
-    // Strategy 1: Group by normalized name AND normalized link
     const toolsByCanonicalKey = new Map<string, AiTool[]>();
     aiTools.forEach(tool => {
         const key = `${normalizeName(tool.name)}|${normalizeLink(tool.summary?.derivedLink || tool.link || '')}`;
@@ -581,7 +587,6 @@ const handleBatchNormalize = async (toolIds: string[]) => {
     });
 
 
-    // Strategy 2: Group by normalized link only, to find same link with different names
     const toolsByLink = new Map<string, AiTool[]>();
     aiTools.forEach(tool => {
         const normalizedLink = normalizeLink(tool.summary?.derivedLink || tool.link || '');
@@ -596,7 +601,6 @@ const handleBatchNormalize = async (toolIds: string[]) => {
     toolsByLink.forEach((toolsWithLink, linkKey) => {
         if (toolsWithLink.length > 1) {
             const names = new Set(toolsWithLink.map(t => normalizeName(t.name)));
-            // Only add if there are different names for the same link
             if (names.size > 1) {
                 const groupKey = `Link Uguale, Nomi Diversi: "${linkKey}"`;
                 if (!foundDuplicatesMap.has(groupKey)) {
@@ -623,7 +627,6 @@ const handleBatchNormalize = async (toolIds: string[]) => {
         }
     });
     
-    // Final check for groups with more than one tool
     const finalDuplicateGroups: DuplicateGroup[] = [];
     foundDuplicatesMap.forEach((group, key) => {
         if (group.tools.length > 1) {
@@ -1128,5 +1131,3 @@ const handleBatchNormalize = async (toolIds: string[]) => {
 export default function Home() {
   return <AiToolList />;
 }
-
-    
